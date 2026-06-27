@@ -32,7 +32,7 @@ export function CallLogSheet({ open, onClose, leadId, leadName }: CallLogSheetPr
   )
 
   const handleSave = () => {
-    console.log('Call log saved', { leadId, outcome, duration, notes, followupDate })
+    onSave()
     toast.success('Call logged successfully')
     onClose()
   }
