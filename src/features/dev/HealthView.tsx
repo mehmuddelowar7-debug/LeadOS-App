@@ -5,6 +5,7 @@ import { isSupabaseConfigured } from '@/lib/supabase'
 
 export function HealthView() {
   const [offlineQueueLen, setOfflineQueueLen] = useState<number | null>(null)
+  const avatarStorageStatus = 'Unknown' // Storage is purely optional and lazily evaluated.
   
   const APP_VERSION = import.meta.env.VITE_APP_VERSION || '1.0.0'
   const APP_ENV = import.meta.env.APP_ENV || 'development'
@@ -63,6 +64,12 @@ export function HealthView() {
                 <span>Service Worker</span>
                 <span className={'serviceWorker' in navigator ? 'text-emerald-500' : 'text-red-500'}>
                   {'serviceWorker' in navigator ? 'Active' : 'Unsupported'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Avatars Storage</span>
+                <span className="text-zinc-500">
+                  {avatarStorageStatus}
                 </span>
               </div>
             </div>

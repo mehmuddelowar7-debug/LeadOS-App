@@ -34,9 +34,20 @@ const PageLoader = () => (
 
 function App() {
   const setUser = useAuthStore((state) => state.setUser)
-  const [isReady, setIsReady] = useState(false)
+  const [bootState, setBootState] = useState<'pending' | 'ready' | 'setup'>('pending')
 
   useEffect(() => {
+    // Run diagnostics silently. If ready, bypass SetupScreen.
+    import('@/lib/diagnostics').then(({ runStartupDiagnostics }) => {
+      runStartupDiagnostics().then(res => {
+        if (res.isReady) {
+          setBootState('ready')
+        } else {
+          setBootState('setup')
+        }
+      })
+    })
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
     })
@@ -50,8 +61,16 @@ function App() {
     return () => subscription.unsubscribe()
   }, [setUser])
 
-  if (!isReady) {
-    return <SetupScreen onComplete={() => setIsReady(true)} />
+  if (bootState === 'pending') {
+    return (
+      <ThemeProvider defaultTheme="dark" storageKey="leados-ui-theme">
+        <PageLoader />
+      </ThemeProvider>
+    )
+  }
+
+  if (bootState === 'setup') {
+    return <SetupScreen onComplete={() => setBootState('ready')} />
   }
 
   return (
