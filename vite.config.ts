@@ -26,13 +26,13 @@ export default defineConfig({
         categories: ['productivity', 'business', 'finance'],
         icons: [
           {
-            src: '/vite.svg',
+            src: '/favicon.svg',
             sizes: '192x192',
             type: 'image/svg+xml',
             purpose: 'any maskable'
           },
           {
-            src: '/vite.svg',
+            src: '/favicon.svg',
             sizes: '512x512',
             type: 'image/svg+xml',
             purpose: 'any maskable'
@@ -44,14 +44,14 @@ export default defineConfig({
             short_name: 'Contact',
             description: 'Capture a new lead',
             url: '/contacts/new?mode=quick',
-            icons: [{ src: '/vite.svg', sizes: '192x192', type: 'image/svg+xml' }]
+            icons: [{ src: '/favicon.svg', sizes: '192x192', type: 'image/svg+xml' }]
           },
           {
             name: 'View Dashboard',
             short_name: 'Dashboard',
             description: 'View your daily metrics',
             url: '/',
-            icons: [{ src: '/vite.svg', sizes: '192x192', type: 'image/svg+xml' }]
+            icons: [{ src: '/favicon.svg', sizes: '192x192', type: 'image/svg+xml' }]
           }
         ]
       },
