@@ -58,6 +58,7 @@ const ChunkErrorScreen = () => (
 )
 
 function App() {
+  console.log('BOOT TRACE: 4. App mounted');
   const setUser = useAuthStore((state) => state.setUser)
   const [bootState, setBootState] = useState<'pending' | 'ready' | 'setup' | 'error'>('pending')
 
@@ -65,6 +66,7 @@ function App() {
     // Run diagnostics silently. If ready, bypass SetupScreen.
     import('@/lib/diagnostics').then(({ runStartupDiagnostics }) => {
       runStartupDiagnostics().then(res => {
+        console.log('BOOT TRACE: 7. Startup diagnostics completed', res);
         sessionStorage.removeItem('leadOS_chunk_reload')
         if (res.isReady) {
           setBootState('ready')
@@ -94,7 +96,9 @@ function App() {
       }
     })
 
+    console.log('BOOT TRACE: 6. Auth initialized');
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('BOOT TRACE: 6. Auth getSession completed');
       setUser(session?.user ?? null)
     })
 
@@ -127,6 +131,7 @@ function App() {
     )
   }
 
+  console.log('BOOT TRACE: 5. BrowserRouter mounting / Routes created');
   return (
     <ThemeProvider defaultTheme="dark" storageKey="leados-ui-theme">
       <PWAUpdater />

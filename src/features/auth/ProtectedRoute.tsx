@@ -3,6 +3,7 @@ import { useAuthStore } from "./AuthStore"
 import { ROUTES } from "@/lib/routes"
 
 export function ProtectedRoute() {
+  console.log('BOOT TRACE: 9. ProtectedRoute executed');
   const { user, isLoading } = useAuthStore()
 
 

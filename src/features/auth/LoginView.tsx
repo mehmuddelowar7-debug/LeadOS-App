@@ -10,6 +10,7 @@ import { Navigate } from 'react-router'
 import { ROUTES } from '@/lib/routes'
 
 export function LoginView() {
+  console.log('BOOT TRACE: 10. LoginView mounted');
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)

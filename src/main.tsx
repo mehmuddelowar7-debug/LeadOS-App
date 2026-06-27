@@ -10,6 +10,8 @@ import { ErrorBoundary } from './components/providers/ErrorBoundary'
 import { GlobalErrorBoundary } from './components/providers/GlobalErrorBoundary'
 import { initStressTester } from './lib/stress-test'
 
+console.log('BOOT TRACE: 2. main.tsx started');
+
 if (import.meta.env.DEV) {
   initStressTester()
 }
@@ -64,6 +66,7 @@ if (IS_PERF_MODE) {
   })
 }
 
+console.log('BOOT TRACE: 3. ReactDOM.createRoot()');
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <GlobalErrorBoundary>

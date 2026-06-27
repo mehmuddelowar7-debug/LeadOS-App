@@ -20,6 +20,7 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 dayjs.extend(relativeTime)
 
 export function DashboardView() {
+  console.log('BOOT TRACE: 11. Dashboard mounted');
   const navigate = useAppNavigate()
   const user = useAuthStore(state => state.user)
   const openSearch = useSearchStore(state => state.openSearch)
