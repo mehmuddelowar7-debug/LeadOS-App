@@ -78,7 +78,7 @@ export function DebugView() {
   const testSupabase = async () => {
     setState(s => ({ ...s, supabaseTest: 'Testing...' }));
     try {
-      const { data, error } = await supabase.from('workspaces').select('id').limit(1);
+      const { error } = await supabase.from('workspaces').select('id').limit(1);
       if (error) throw error;
       setState(s => ({ ...s, supabaseTest: 'OK' }));
     } catch (e: any) {
