@@ -23,7 +23,7 @@ const OUTCOMES = [
   { id: 'no_answer', label: 'No Answer', color: 'bg-gray-500/10 text-gray-600 border-gray-500/30' },
 ]
 
-export function CallLogSheet({ open, onClose, leadId, leadName }: CallLogSheetProps) {
+export function CallLogSheet({ open, onClose, leadId: _leadId, leadName }: CallLogSheetProps) {
   const [outcome, setOutcome] = useState<string>('interested')
   const [duration, setDuration] = useState<string>('2')
   const [notes, setNotes] = useState('')
@@ -32,7 +32,6 @@ export function CallLogSheet({ open, onClose, leadId, leadName }: CallLogSheetPr
   )
 
   const handleSave = () => {
-    onSave()
     toast.success('Call logged successfully')
     onClose()
   }
