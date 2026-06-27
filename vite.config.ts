@@ -11,6 +11,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'prompt',
+      useCredentials: true,
       devOptions: {
         enabled: true
       },
