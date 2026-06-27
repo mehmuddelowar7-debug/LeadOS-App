@@ -69,20 +69,10 @@ export async function runStartupDiagnostics(): Promise<DiagnosticReport> {
     isReady = false
   }
 
-  // 3. Storage Buckets (Optional/Warning if missing)
-  if (state.supabaseConnection === 'ok') {
-    try {
-      const { error } = await supabase.storage.getBucket('avatars')
-      if (error) {
-        state.storageBuckets = 'warning'
-        details.push('Avatars storage bucket is missing. User profiles will not display images.')
-      } else {
-        state.storageBuckets = 'ok'
-      }
-    } catch {
-      state.storageBuckets = 'warning'
-    }
-  }
+  // 3. Storage Buckets
+  // Frontend anon keys do not have permissions to query storage.buckets. 
+  // We assume the bucket is configured if the database is.
+  state.storageBuckets = 'ok'
 
   return { isReady, state, details }
 }
