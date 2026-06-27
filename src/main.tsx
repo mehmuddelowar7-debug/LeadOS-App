@@ -67,17 +67,31 @@ if (IS_PERF_MODE) {
 }
 
 console.log('BOOT TRACE: 3. ReactDOM.createRoot()');
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <GlobalErrorBoundary>
-      <PersistQueryClientProvider
-        client={queryClient}
-        persistOptions={{ persister: createIDBPersister() }}
-      >
-        <Sentry.ErrorBoundary fallback={<ErrorBoundary />}>
-          <App />
-        </Sentry.ErrorBoundary>
-      </PersistQueryClientProvider>
-    </GlobalErrorBoundary>
-  </StrictMode>,
-)
+const root = document.getElementById('root')!
+
+if (window.location.pathname === '/ping') {
+  createRoot(root).render(
+    <div style={{ color: 'white', background: 'black', padding: '20px', fontFamily: 'monospace' }}>
+      LeadOS Debug OK
+    </div>
+  )
+} else if (window.location.pathname === '/debug') {
+  import('./features/dev/DebugView').then(m => {
+    createRoot(root).render(<m.DebugView />)
+  })
+} else {
+  createRoot(root).render(
+    <StrictMode>
+      <GlobalErrorBoundary>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{ persister: createIDBPersister() }}
+        >
+          <Sentry.ErrorBoundary fallback={<ErrorBoundary />}>
+            <App />
+          </Sentry.ErrorBoundary>
+        </PersistQueryClientProvider>
+      </GlobalErrorBoundary>
+    </StrictMode>,
+  )
+}
