@@ -13,6 +13,10 @@ import { ContactEntryView } from "@/features/contacts/ContactEntryView"
 import { QueueLayout } from "@/features/followups/QueueLayout"
 import { NetworkProvider } from "@/components/providers/NetworkProvider"
 import { ContactProfileView } from "@/features/contacts/ContactProfileView"
+import { ROUTES } from "@/lib/routes"
+import { NotFoundRedirect } from "@/components/layout/NotFoundRedirect"
+import { RouteErrorBoundary } from "@/components/providers/RouteErrorBoundary"
+
 // Lazy load non-critical routes
 const AnalyticsView = lazy(() => import("@/features/analytics/AnalyticsView").then(m => ({ default: m.AnalyticsView })))
 const ProfileView = lazy(() => import("@/features/profile/ProfileView").then(m => ({ default: m.ProfileView })))
@@ -126,38 +130,46 @@ function App() {
   return (
     <ThemeProvider defaultTheme="dark" storageKey="leados-ui-theme">
       <PWAUpdater />
-      <BrowserRouter>
-        <RouteTracker />
-        <Routes>
-          <Route path="/health" element={<HealthView />} />
-          <Route path="/auth" element={<LoginView />} />
+      <RouteErrorBoundary>
+        <BrowserRouter>
+          <RouteTracker />
+          <Routes>
+            <Route path={ROUTES.HEALTH} element={<HealthView />} />
+            <Route path={ROUTES.AUTH} element={<LoginView />} />
 
-          <Route element={<ProtectedRoute />}>
-            <Route element={
-              <NetworkProvider>
-                <Suspense fallback={<PageLoader />}>
-                  <AppShell />
-                </Suspense>
-              </NetworkProvider>
-            }>
-              <Route element={<KeepAliveTabs />}>
-                <Route path="/" element={<DashboardView />} />
-                <Route path="/contacts" element={<ContactsLayout />} />
-                <Route path="/referrals" element={<ReferralDashboardView />} />
-                
-                <Route path="/insights" element={<InsightsView />} />
-                <Route path="/contacts/new" element={<ContactEntryView />} />
-                <Route path="/queue" element={<QueueLayout />}>
-                  <Route path=":id" element={<ContactProfileView />} />
+            <Route element={<ProtectedRoute />}>
+              <Route element={
+                <NetworkProvider>
+                  <Suspense fallback={<PageLoader />}>
+                    <AppShell />
+                  </Suspense>
+                </NetworkProvider>
+              }>
+                <Route element={<KeepAliveTabs />}>
+                  <Route path={ROUTES.HOME} element={<DashboardView />} />
+                  <Route path={ROUTES.CONTACTS} element={<ContactsLayout />} />
+                  <Route path={ROUTES.REFERRALS} element={<ReferralDashboardView />} />
+                  
+                  <Route path={ROUTES.INSIGHTS} element={<InsightsView />} />
+                  <Route path={ROUTES.CONTACTS_NEW} element={<ContactEntryView />} />
+                  <Route path={ROUTES.QUEUE} element={<QueueLayout />}>
+                    <Route path="calls" element={<div className="p-4">Call Queue</div>} />
+                    <Route path="whatsapp" element={<div className="p-4">WhatsApp Queue</div>} />
+                    <Route path="pending" element={<div className="p-4">Pending Sync</div>} />
+                  </Route>
+                  <Route path={ROUTES.ANALYTICS} element={<AnalyticsView />} />
+                  <Route path={ROUTES.PROFILE} element={<ProfileView />} />
+                  <Route path={ROUTES.INCENTIVES} element={<IncentiveTrackerView />} />
+                  <Route path={ROUTES.CONTACT_DETAILS} element={<ContactProfileView />} />
                 </Route>
-                <Route path="/analytics" element={<AnalyticsView />} />
-                <Route path="/profile" element={<ProfileView />} />
-                <Route path="/earnings" element={<IncentiveTrackerView />} />
               </Route>
             </Route>
-          </Route>
-        </Routes>
-      </BrowserRouter>
+
+            {/* Catch-all route to guarantee no blank screens */}
+            <Route path="*" element={<NotFoundRedirect />} />
+          </Routes>
+        </BrowserRouter>
+      </RouteErrorBoundary>
       <Toaster position="top-center" richColors />
     </ThemeProvider>
   )

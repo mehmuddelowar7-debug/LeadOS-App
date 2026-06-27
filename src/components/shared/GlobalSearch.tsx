@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, X, Loader2, User, Phone } from 'lucide-react'
-import { useNavigate } from 'react-router'
+import { useAppNavigate } from '@/lib/routes'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/features/auth/AuthStore'
@@ -15,7 +15,7 @@ interface GlobalSearchProps {
 export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
-  const navigate = useNavigate()
+  const navigate = useAppNavigate()
   const user = useAuthStore(state => state.user)
 
   useEffect(() => {

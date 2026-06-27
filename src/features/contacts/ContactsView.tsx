@@ -1,3 +1,4 @@
+import { useAppNavigate } from '@/lib/routes'
 import { useState, useRef, memo, useMemo, useCallback } from 'react'
 import { PerformanceProfiler } from '@/components/dev/PerformanceProfiler'
 import { useRenderProfiler } from '@/hooks/useRenderProfiler'
@@ -5,7 +6,7 @@ import { Search, UserPlus, Download, Phone, MessageCircle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { CONTACT_ROLES, type ContactRole, type Contact } from '@/types'
-import { useNavigate, useLocation } from 'react-router'
+import { useLocation } from 'react-router'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useDebounce } from '@/lib/useDebounce'
 import { toast } from 'sonner'
@@ -153,7 +154,7 @@ function ListView({ contacts, onContactClick, activeId }: { contacts: Contact[],
 // Contacts View (Main)
 // ============================================================================
 export function ContactsView() {
-  const navigate = useNavigate()
+  const navigate = useAppNavigate()
   const location = useLocation()
   
   const activeId = location.pathname.split('/').pop() || null

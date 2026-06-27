@@ -1,5 +1,7 @@
+import { ROUTES } from '@/lib/routes'
+import { useAppNavigate } from '@/lib/routes'
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useParams } from 'react-router'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, Phone, MessageCircle, Edit, Calendar,
@@ -110,7 +112,7 @@ const TABS = ['Profile', 'History', 'Operations'] as const
 
 export function ContactProfileView() {
   const { id } = useParams()
-  const navigate = useNavigate()
+  const navigate = useAppNavigate()
   const [activeTab, setActiveTab] = useState<typeof TABS[number]>('Profile')
   const [callSheetOpen, setCallSheetOpen] = useState(false)
   const [whatsappSheetOpen, setWhatsappSheetOpen] = useState(false)
@@ -126,7 +128,7 @@ export function ContactProfileView() {
   const handleDelete = () => {
     if (window.confirm('Are you sure you want to delete this contact? This cannot be undone.')) {
       toast.success('Contact deleted successfully')
-      navigate('/contacts')
+      navigate(ROUTES.CONTACTS)
     }
   }
 
@@ -144,7 +146,7 @@ export function ContactProfileView() {
       <div className="flex flex-col h-full items-center justify-center p-6 text-center">
         <h3 className="text-lg font-bold text-foreground mb-2">Contact not found</h3>
         <p className="text-sm text-muted-foreground mb-4">This contact may have been deleted.</p>
-        <Button onClick={() => navigate('/contacts')}>Return to Network</Button>
+        <Button onClick={() => navigate(ROUTES.CONTACTS)}>Return to Network</Button>
       </div>
     )
   }
@@ -164,7 +166,7 @@ export function ContactProfileView() {
         <div className="relative pt-2">
           <div className="flex items-center justify-between mb-4">
             <button
-              onClick={() => navigate('/contacts')}
+              onClick={() => navigate(ROUTES.CONTACTS)}
               className="md:hidden h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors"
             >
               <ArrowLeft className="h-5 w-5" />

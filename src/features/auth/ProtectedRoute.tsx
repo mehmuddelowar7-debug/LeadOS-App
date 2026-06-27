@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from "react-router"
 import { useAuthStore } from "./AuthStore"
+import { ROUTES } from "@/lib/routes"
 
 export function ProtectedRoute() {
   const { user, isLoading } = useAuthStore()
@@ -18,7 +19,7 @@ export function ProtectedRoute() {
   }
 
   if (!user) {
-    return <Navigate to="/auth" replace />
+    return <Navigate to={ROUTES.AUTH} replace />
   }
 
   return <Outlet />

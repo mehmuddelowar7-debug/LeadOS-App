@@ -1,8 +1,9 @@
+import { ROUTES } from '@/lib/routes'
 import { useState, useMemo } from 'react'
 import { PerformanceProfiler } from '@/components/dev/PerformanceProfiler'
 import { useRenderProfiler } from '@/hooks/useRenderProfiler'
 import { motion } from 'framer-motion'
-import { useNavigate } from 'react-router'
+import { useAppNavigate } from '@/lib/routes'
 import { ProgressRing } from '@/components/shared/ProgressRing'
 import {
   PhoneCall, Calendar, Plus, Zap, Users, 
@@ -21,7 +22,7 @@ const MetricSkeleton = () => <div className="inline-block w-10 h-6 bg-primary/10
 // Removed animation container variants to reduce UX latency
 
 export function InsightsView() {
-  const navigate = useNavigate()
+  const navigate = useAppNavigate()
   const user = useAuthStore(state => state.user)
   const [endDayOpen, setEndDayOpen] = useState(false)
 
@@ -149,21 +150,21 @@ export function InsightsView() {
       <div className="space-y-3 pb-8">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Network Health</h2>
         <div className="grid grid-cols-2 gap-3">
-          <div className="glass-card rounded-xl p-4 space-y-2 group cursor-pointer" onClick={() => navigate('/referrals')}>
+          <div className="glass-card rounded-xl p-4 space-y-2 group cursor-pointer" onClick={() => navigate(ROUTES.REFERRALS)}>
             <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
               <Award className="h-4 w-4 text-emerald-500" />
             </div>
             <div className="text-2xl font-bold text-foreground tracking-tight">₹{isMetricsLoading ? <MetricSkeleton /> : `${(stats.lifetimeRewards / 1000).toFixed(0)}k`}</div>
             <div className="text-[11px] text-muted-foreground font-medium">Rewards Paid</div>
           </div>
-          <div className="glass-card rounded-xl p-4 space-y-2 group cursor-pointer" onClick={() => navigate('/contacts')}>
+          <div className="glass-card rounded-xl p-4 space-y-2 group cursor-pointer" onClick={() => navigate(ROUTES.CONTACTS)}>
             <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
               <Users className="h-4 w-4 text-blue-500" />
             </div>
             <div className="text-2xl font-bold text-foreground tracking-tight">{isMetricsLoading ? <MetricSkeleton /> : stats.opportunities}</div>
             <div className="text-[11px] text-muted-foreground font-medium">Active Opportunities</div>
           </div>
-          <div className="glass-card rounded-xl p-4 space-y-2 group cursor-pointer" onClick={() => navigate('/referrals')}>
+          <div className="glass-card rounded-xl p-4 space-y-2 group cursor-pointer" onClick={() => navigate(ROUTES.REFERRALS)}>
             <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
               <TrendingUp className="h-4 w-4 text-amber-500" />
             </div>

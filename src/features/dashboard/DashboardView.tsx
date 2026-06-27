@@ -1,8 +1,9 @@
+import { ROUTES } from '@/lib/routes'
 import { useState, useMemo } from 'react'
 import { PerformanceProfiler } from '@/components/dev/PerformanceProfiler'
 import { useRenderProfiler } from '@/hooks/useRenderProfiler'
 import { motion } from 'framer-motion'
-import { useNavigate } from 'react-router'
+import { useAppNavigate } from '@/lib/routes'
 import { 
   Plus, Zap, ArrowRight,
   MoonStar, PhoneCall, AlertCircle, Clock
@@ -19,7 +20,7 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 dayjs.extend(relativeTime)
 
 export function DashboardView() {
-  const navigate = useNavigate()
+  const navigate = useAppNavigate()
   const user = useAuthStore(state => state.user)
   const openSearch = useSearchStore(state => state.openSearch)
   const [endDayOpen, setEndDayOpen] = useState(false)
@@ -163,7 +164,7 @@ export function DashboardView() {
               </div>
             )}
             
-            <button onClick={() => navigate('/contacts')} className="w-full h-14 rounded-2xl text-sm font-bold text-primary hover:bg-primary/10 transition-colors touch-target">
+            <button onClick={() => navigate(ROUTES.CONTACTS)} className="w-full h-14 rounded-2xl text-sm font-bold text-primary hover:bg-primary/10 transition-colors touch-target">
               View All Network
             </button>
           </div>

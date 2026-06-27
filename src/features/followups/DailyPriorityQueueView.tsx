@@ -1,7 +1,8 @@
+import { useAppNavigate } from '@/lib/routes'
 import { useState } from 'react'
 import { motion, useAnimation, type PanInfo } from 'framer-motion'
 import { CheckCircle, AlertCircle, Phone, Calendar, Zap, TrendingUp, Sparkles, Check } from 'lucide-react'
-import { useNavigate, useLocation } from 'react-router'
+import { useLocation } from 'react-router'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -16,7 +17,7 @@ import { useQueue, type QueueItem } from '@/hooks/useQueue'
 // Queue Item Card
 // ============================================================================
 function QueueCard({ item: queueItem, isActive }: { item: QueueItem, isActive: boolean }) {
-  const navigate = useNavigate()
+  const navigate = useAppNavigate()
   const controls = useAnimation()
   const [completed, setCompleted] = useState(false)
 

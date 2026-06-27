@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner'
 import { useAuthStore } from './AuthStore'
 import { Navigate } from 'react-router'
+import { ROUTES } from '@/lib/routes'
 
 export function LoginView() {
   const [email, setEmail] = useState('')
@@ -17,7 +18,7 @@ export function LoginView() {
   const [isSignUp, setIsSignUp] = useState(false)
 
   if (user) {
-    return <Navigate to="/" replace />
+    return <Navigate to={ROUTES.HOME} replace />
   }
 
   const handleLogin = async (e: React.FormEvent) => {

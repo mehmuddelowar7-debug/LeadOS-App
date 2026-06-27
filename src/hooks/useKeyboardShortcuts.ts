@@ -1,9 +1,10 @@
+import { ROUTES } from '@/lib/routes'
 import { useEffect } from 'react'
-import { useNavigate } from 'react-router'
+import { useAppNavigate } from '@/lib/routes'
 import { useSearchStore } from './useSearchStore'
 
 export function useKeyboardShortcuts() {
-  const navigate = useNavigate()
+  const navigate = useAppNavigate()
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -34,7 +35,7 @@ export function useKeyboardShortcuts() {
       switch (e.key.toLowerCase()) {
         case 'n':
           e.preventDefault()
-          navigate('/contacts/new')
+          navigate(ROUTES.CONTACTS_NEW)
           break
         case 'f':
           e.preventDefault()
@@ -42,11 +43,11 @@ export function useKeyboardShortcuts() {
           break
         case 'd':
           e.preventDefault()
-          navigate('/')
+          navigate(ROUTES.HOME)
           break
         case 'i':
           e.preventDefault()
-          navigate('/insights')
+          navigate(ROUTES.INSIGHTS)
           break
       }
     }

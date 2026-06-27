@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useNavigate } from 'react-router'
+import { useAppNavigate } from '@/lib/routes'
 import {
   Sun, Moon, LogOut, ChevronRight, Shield, Bell,
   Download, Trophy, Zap, Flame, Target, BrainCircuit, Bug
@@ -36,7 +36,7 @@ export function ProfileView() {
   const signOut = useAuthStore(state => state.signOut)
   const user = useAuthStore(state => state.user)
   const { data: metrics } = useDashboardMetrics()
-  const navigate = useNavigate()
+  const navigate = useAppNavigate()
   const [bugReportOpen, setBugReportOpen] = useState(false)
   const [dataManagementOpen, setDataManagementOpen] = useState(false)
 

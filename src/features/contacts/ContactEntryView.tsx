@@ -1,7 +1,9 @@
+import { ROUTES } from '@/lib/routes'
+import { useAppNavigate } from '@/lib/routes'
 import { useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useNavigate, useSearchParams } from 'react-router'
+import { useSearchParams } from 'react-router'
 import { ArrowLeft, Save, AlertTriangle, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -69,7 +71,7 @@ function TouchCardSelect({ options, value, onChange, multiple = false, label }: 
 // Quick Capture Form (Walk-in / Contact Entry)
 // ============================================================================
 function QuickCaptureForm() {
-  const navigate = useNavigate()
+  const navigate = useAppNavigate()
   const user = useAuthStore(state => state.user)
   const [duplicateContact, setDuplicateContact] = useState<any>(null)
   const { data: opportunityTypes = [] } = useOpportunityTypes()
@@ -191,7 +193,7 @@ function QuickCaptureForm() {
         
         toast.success('Contact saved instantly!')
       }
-      navigate('/contacts')
+      navigate(ROUTES.CONTACTS)
     } catch (err) {
       console.error(err)
       toast.error('Failed to save contact')
@@ -339,7 +341,7 @@ function FullEntryForm() {
 // Contact Entry Router
 // ============================================================================
 export function ContactEntryView() {
-  const navigate = useNavigate()
+  const navigate = useAppNavigate()
   const [searchParams] = useSearchParams()
   const mode = searchParams.get('mode') || 'quick'
 
