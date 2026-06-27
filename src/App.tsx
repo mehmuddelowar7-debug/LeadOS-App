@@ -46,6 +46,10 @@ function App() {
           setBootState('setup')
         }
       })
+    }).catch((err) => {
+      console.error('Failed to load diagnostics module:', err);
+      // If the chunk fails to load (e.g. after a deployment), force a reload to get the new assets
+      window.location.reload();
     })
 
     supabase.auth.getSession().then(({ data: { session } }) => {
