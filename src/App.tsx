@@ -27,7 +27,7 @@ import { HealthView } from "@/features/dev/HealthView"
 import { PWAUpdater } from "@/components/layout/PWAUpdater"
 // Loading Fallback
 const PageLoader = () => (
-  <div className="h-full w-full flex items-center justify-center bg-background">
+  <div className="min-h-[100dvh] w-full flex items-center justify-center bg-background">
     <Loader2 className="h-8 w-8 animate-spin text-primary opacity-50" />
   </div>
 )
