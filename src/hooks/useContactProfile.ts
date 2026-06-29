@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { type Contact, type Opportunity, type ContactActivity } from '@/types'
+import { type Contact, type Opportunity, type ContactActivity, type Referral } from '@/types'
 
 export interface ContactProfileData extends Contact {
   opportunity?: Opportunity
   activities: ContactActivity[]
+  referredBy?: Referral
+  referredCandidates: Referral[]
 }
 
 export function useContactProfile(id?: string) {
@@ -34,14 +36,32 @@ export function useContactProfile(id?: string) {
       // Fetch activities
       const { data: activities = [] } = await supabase
         .from('contact_activities')
-        .select('id, workspace_id, contact_id, type, details, created_at, created_by')
+        .select('id, workspace_id, contact_id, type, details, created_at, created_by, activity_date')
         .eq('contact_id', id)
+        .order('created_at', { ascending: false })
+
+      // Fetch Referrer (who referred this contact)
+      const { data: referredBy } = await supabase
+        .from('referrals')
+        .select('*, referrer:referrer_id(name)')
+        .eq('candidate_contact_id', id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      // Fetch Referred Candidates (who this contact referred)
+      const { data: referredCandidates = [] } = await supabase
+        .from('referrals')
+        .select('*, candidate:candidate_contact_id(name)')
+        .eq('referrer_id', id)
         .order('created_at', { ascending: false })
 
       return {
         ...contact,
         opportunity: opportunity || undefined,
-        activities: activities || []
+        activities: activities || [],
+        referredBy: referredBy || undefined,
+        referredCandidates: referredCandidates || []
       } as unknown as ContactProfileData
     },
     enabled: !!id,

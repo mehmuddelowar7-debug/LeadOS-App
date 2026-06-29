@@ -7,6 +7,7 @@ export const ROUTES = {
   CONTACTS: "/contacts",
   CONTACT_DETAILS: "/contacts/:id", // Use dynamic matching in components, but careful when navigating directly
   CONTACTS_NEW: "/contacts/new",
+  QUICK_CAPTURE: "/capture",
   REFERRALS: "/referrals",
   INSIGHTS: "/insights",
   PROFILE: "/profile",

@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSearchParams } from 'react-router'
-import { ArrowLeft, Save, AlertTriangle, Check } from 'lucide-react'
+import { ArrowLeft, Save, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,11 +13,10 @@ import { toast } from 'sonner'
 import { pushToMutationQueue } from '@/lib/offlineSync'
 import { supabase } from '@/lib/supabase'
 import {
-  CONTACT_ROLES,
-  INTEREST_LEVELS, CONTACT_SOURCES,
+  CONTACT_SOURCES,
 } from '@/types'
 import { useAuthStore } from '@/features/auth/AuthStore'
-import { useOpportunityTypes } from '@/hooks/useOpportunityTypes'
+
 
 // ============================================================================
 // Touch Card Select Component
@@ -74,23 +73,24 @@ function QuickCaptureForm() {
   const navigate = useAppNavigate()
   const user = useAuthStore(state => state.user)
   const [duplicateContact, setDuplicateContact] = useState<any>(null)
-  const { data: opportunityTypes = [] } = useOpportunityTypes()
   
   const { register, handleSubmit, watch, setValue, formState: {} } = useForm<any>({
     defaultValues: { 
       roles: ['opportunity'],
       source: 'walk_in', 
-      interest_level: 'interested',
-      opportunity_type_id: '',
       name: '',
-      phone: ''
+      phone: '',
+      current_area: '',
+      origin: '',
+      notes: '',
+      entry_date: new Date().toISOString().split('T')[0]
     }
   })
 
   const phoneInputRef = useRef<HTMLInputElement>(null)
 
   const checkDuplicate = async (phone: string) => {
-    const cleanPhone = phone.replace(/\\D/g, '')
+    const cleanPhone = phone.replace(/\D/g, '')
     if (cleanPhone.length < 10) {
       setDuplicateContact(null)
       return
@@ -109,7 +109,7 @@ function QuickCaptureForm() {
   }
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(/\\D/g, '')
+    let val = e.target.value.replace(/\D/g, '')
     if (val.length > 10) val = val.slice(0, 10)
     setValue('phone', val)
     if (val.length === 10) {
@@ -125,18 +125,6 @@ function QuickCaptureForm() {
   }
 
   const onSubmit = async (data: any) => {
-    const isOpportunity = data.roles.includes('opportunity')
-    
-    if (isOpportunity && !data.opportunity_type_id) {
-      toast.error('Please select a campaign type for the opportunity')
-      return
-    }
-
-    if (!data.name || !data.phone) {
-      toast.error('Name and Phone are required')
-      return
-    }
-
     const contactId = duplicateContact ? duplicateContact.id : crypto.randomUUID()
     const workspaceId = user?.user_metadata?.workspace_id || '00000000-0000-0000-0000-000000000000'
     const userId = user?.id || '00000000-0000-0000-0000-000000000000'
@@ -150,45 +138,22 @@ function QuickCaptureForm() {
       roles: data.roles,
       source: data.source,
       origin: data.origin,
-      current_area: data.current_area
+      current_area: data.current_area,
+      notes: data.notes,
+      entry_date: data.entry_date
     }
 
     try {
       if (!navigator.onLine) {
         await pushToMutationQueue({ table: 'contacts', action: 'INSERT', payload: contactPayload })
-        
-        if (isOpportunity) {
-           await pushToMutationQueue({
-             table: 'opportunities',
-             action: 'INSERT',
-             payload: {
-               id: crypto.randomUUID(),
-               workspace_id: workspaceId,
-               contact_id: contactId,
-               opportunity_type_id: data.opportunity_type_id,
-               status: 'new',
-               interest_level: data.interest_level
-             }
-           })
-        }
         toast.success('Saved Offline')
       } else {
-        // Simple insert for mock purposes. Merge would normally use upsert.
         if (!duplicateContact) {
           const { error } = await supabase.from('contacts').insert(contactPayload)
           if (error) throw error
-        }
-        
-        if (isOpportunity && !duplicateContact) {
-           const { error: candError } = await supabase.from('opportunities').insert({
-               id: crypto.randomUUID(),
-               workspace_id: workspaceId,
-               contact_id: contactId,
-               opportunity_type_id: data.opportunity_type_id,
-               status: 'new',
-               interest_level: data.interest_level
-           })
-           if (candError) throw candError
+        } else {
+          const { error } = await supabase.from('contacts').update(contactPayload).eq('id', contactId)
+          if (error) throw error
         }
         
         toast.success('Contact saved instantly!')
@@ -199,9 +164,6 @@ function QuickCaptureForm() {
       toast.error('Failed to save contact')
     }
   }
-
-  const selectedOpportunityType = watch('opportunity_type_id')
-  const selectedRoles = watch('roles') || []
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-[calc(100vh-140px)]">
@@ -243,6 +205,16 @@ function QuickCaptureForm() {
               onChange={handlePhoneChange}
             />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="entry-date" className="text-sm font-bold text-foreground uppercase tracking-wider">Entry Date *</Label>
+            <Input
+              id="entry-date"
+              type="date"
+              className="h-16 text-xl rounded-2xl bg-muted/50 border-transparent focus:bg-background shadow-sm"
+              {...register('entry_date')}
+            />
+          </div>
         </div>
 
         <AnimatePresence>
@@ -267,53 +239,55 @@ function QuickCaptureForm() {
           )}
         </AnimatePresence>
 
-        <TouchCardSelect
-          label="1. Select Roles"
-          options={CONTACT_ROLES}
-          value={selectedRoles}
-          onChange={(v) => setValue('roles', v as string[])}
-          multiple
-        />
+        <div className="pt-4 space-y-6">
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">More Details</h3>
+            <div className="h-px bg-border flex-1" />
+          </div>
 
-        {selectedRoles.includes('opportunity') && (
-          <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <Label className="text-sm font-bold text-foreground uppercase tracking-wider">2. Campaign *</Label>
-            <div className="grid grid-cols-2 gap-3">
-              {opportunityTypes.map((type) => (
-                <button
-                  key={type.id}
-                  type="button"
-                  onClick={() => setValue('opportunity_type_id', type.id)}
-                  className={cn(
-                    'min-h-[64px] rounded-2xl flex items-center justify-between px-5 font-bold transition-all border-2 touch-target active:scale-95',
-                    selectedOpportunityType === type.id 
-                      ? `bg-${type.color}-500/10 border-${type.color}-500 text-${type.color}-600 dark:text-${type.color}-400 shadow-sm`
-                      : 'bg-muted/50 border-transparent text-muted-foreground hover:bg-accent'
-                  )}
-                >
-                  <span className="truncate mr-2 text-base">{type.name}</span>
-                  {selectedOpportunityType === type.id && <Check className="h-6 w-6 shrink-0" />}
-                </button>
-              ))}
+          <TouchCardSelect
+            label="Source"
+            options={CONTACT_SOURCES}
+            value={watch('source') || ''}
+            onChange={(v) => setValue('source', v as string)}
+          />
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="contact-area" className="text-sm font-bold text-foreground uppercase tracking-wider">Location</Label>
+              <Input
+                id="contact-area"
+                placeholder="e.g. Koramangala"
+                className="h-14 text-base rounded-2xl bg-muted/50 border-transparent focus:bg-background shadow-sm"
+                {...register('current_area')}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="contact-state" className="text-sm font-bold text-foreground uppercase tracking-wider">State</Label>
+              <select
+                id="contact-state"
+                className="w-full h-14 text-base rounded-2xl bg-muted/50 border-transparent focus:bg-background shadow-sm px-4 focus:outline-none focus:ring-2 focus:ring-ring"
+                {...register('origin')}
+              >
+                <option value="">Select State</option>
+                {['Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'].map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
             </div>
           </div>
-        )}
 
-        {selectedRoles.includes('opportunity') && (
-          <TouchCardSelect
-            label="3. Interest Level"
-            options={INTEREST_LEVELS}
-            value={watch('interest_level')}
-            onChange={(v) => setValue('interest_level', v as string)}
-          />
-        )}
-
-        <TouchCardSelect
-          label={selectedRoles.includes('opportunity') ? "4. Source" : "2. Source"}
-          options={CONTACT_SOURCES}
-          value={watch('source') || ''}
-          onChange={(v) => setValue('source', v as string)}
-        />
+          <div className="space-y-2">
+            <Label htmlFor="contact-notes" className="text-sm font-bold text-foreground uppercase tracking-wider">Notes</Label>
+            <textarea
+              id="contact-notes"
+              placeholder="Any additional details..."
+              className="w-full min-h-[100px] p-4 text-base rounded-2xl bg-muted/50 border-transparent focus:bg-background shadow-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              {...register('notes')}
+            />
+          </div>
+        </div>
         
       </div>
 
@@ -368,10 +342,10 @@ export function ContactEntryView() {
         ] as const).map((tab) => (
           <button
             key={tab.key}
-            onClick={() => navigate(`/contacts/new?mode=${tab.key}`, { replace: true })}
+            onClick={() => navigate(tab.key === 'quick' ? ROUTES.QUICK_CAPTURE : `${ROUTES.CONTACTS_NEW}?mode=full`, { replace: true })}
             className={cn(
               'flex-1 py-3 rounded-lg text-sm font-bold transition-all touch-target',
-              mode === tab.key
+              (mode === tab.key || (mode === 'quick' && window.location.pathname === ROUTES.QUICK_CAPTURE))
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
             )}
@@ -383,8 +357,8 @@ export function ContactEntryView() {
 
       {/* Form Content */}
       <div className="flex-1 overflow-hidden">
-        {mode === 'quick' && <QuickCaptureForm />}
-        {mode === 'full' && <FullEntryForm />}
+        {(mode === 'quick' || window.location.pathname === ROUTES.QUICK_CAPTURE) && <QuickCaptureForm />}
+        {mode === 'full' && window.location.pathname !== ROUTES.QUICK_CAPTURE && <FullEntryForm />}
       </div>
     </div>
   )

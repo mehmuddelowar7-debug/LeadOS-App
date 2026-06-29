@@ -30,6 +30,9 @@ export function CallLogSheet({ open, onClose, leadId: _leadId, leadName }: CallL
   const [followupDate, setFollowupDate] = useState<string>(
     dayjs().add(1, 'day').format('YYYY-MM-DDTHH:mm')
   )
+  const [activityDate, setActivityDate] = useState<string>(
+    dayjs().format('YYYY-MM-DD')
+  )
 
   const handleSave = () => {
     toast.success('Call logged successfully')
@@ -91,6 +94,20 @@ export function CallLogSheet({ open, onClose, leadId: _leadId, leadName }: CallL
                       {o.label}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Activity Date */}
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Call Date</Label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="date"
+                    value={activityDate}
+                    onChange={e => setActivityDate(e.target.value)}
+                    className="pl-9 h-12 rounded-xl"
+                  />
                 </div>
               </div>
 

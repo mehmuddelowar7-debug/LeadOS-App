@@ -1,12 +1,16 @@
 import { useState, useMemo } from 'react'
 import { PerformanceProfiler } from '@/components/dev/PerformanceProfiler'
 import { useRenderProfiler } from '@/hooks/useRenderProfiler'
-import { Users, Award, Search, ArrowUpRight, CheckCircle2, Clock } from 'lucide-react'
+import { Users, Award, Search, ArrowUpRight, CheckCircle2, Clock, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics'
 import { useReferrals } from '@/hooks/useReferrals'
+import { useReferralEarnings } from '@/hooks/useReferralEarnings'
+import { AddReferralSheet } from './AddReferralSheet'
+import { Plus } from 'lucide-react'
+import type { Referral } from '@/types'
 
 const getContactName = (contactData: unknown): string => {
   if (Array.isArray(contactData)) return contactData[0]?.name || 'Unknown'
@@ -18,13 +22,14 @@ const getContactName = (contactData: unknown): string => {
 
 export function ReferralDashboardView() {
   const [search, setSearch] = useState('')
-  const { data: metrics, isLoading: loadingMetrics } = useDashboardMetrics()
+  const [addSheetOpen, setAddSheetOpen] = useState(false)
+  const [editingReferral, setEditingReferral] = useState<Referral | undefined>(undefined)
+
+  const { data: metrics } = useDashboardMetrics()
   const { data: referrals, isLoading: loadingReferrals } = useReferrals()
+  const { data: earnings, isLoading: loadingEarnings } = useReferralEarnings()
 
-  useRenderProfiler('ReferralDashboardView', {}, { search, metrics, referrals })
-
-  const pendingAmount = metrics?.referrals.pending ? metrics.referrals.pending * 5000 : 0
-  const paidAmount = metrics?.referrals.paid ? metrics.referrals.paid * 5000 : 0
+  useRenderProfiler('ReferralDashboardView', {}, { search, metrics, referrals, earnings })
 
   const filteredReferrals = useMemo(() => {
     return (referrals || []).filter(r =>
@@ -58,8 +63,14 @@ export function ReferralDashboardView() {
       {/* Header */}
       <div className="flex items-center justify-between pt-2">
         <h1 className="text-2xl font-black text-foreground tracking-tight">Referrals</h1>
-        <Button className="min-h-[44px] bg-primary/10 text-primary hover:bg-primary/20 rounded-xl font-bold touch-target">
-          <Users className="h-4 w-4 mr-2" /> Partners
+        <Button 
+          onClick={() => {
+            setEditingReferral(undefined)
+            setAddSheetOpen(true)
+          }}
+          className="min-h-[44px] bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-bold touch-target"
+        >
+          <Plus className="h-4 w-4 mr-2 stroke-[3]" /> Add Referral
         </Button>
       </div>
 
@@ -67,30 +78,44 @@ export function ReferralDashboardView() {
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2 glass-card rounded-[24px] p-6 bg-primary/10 border-primary/20 flex flex-col justify-between shadow-sm touch-target">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-bold text-primary uppercase tracking-wider">Lifetime Earnings</span>
+            <span className="text-sm font-bold text-primary uppercase tracking-wider">Total Commission</span>
             <Award className="h-6 w-6 text-primary" />
           </div>
           <p className="text-5xl font-black text-foreground tracking-tighter">
-            {loadingMetrics ? <span className="inline-block w-32 h-10 bg-primary/10 animate-pulse rounded" /> : `₹${paidAmount.toLocaleString()}`}
+            {loadingEarnings ? <span className="inline-block w-32 h-10 bg-primary/10 animate-pulse rounded" /> : `₹${(earnings?.total || 0).toLocaleString()}`}
           </p>
         </div>
 
-        <div className="glass-card rounded-2xl p-4 flex flex-col justify-between shadow-sm touch-target">
+        <div className="glass-card rounded-2xl p-4 flex flex-col justify-between shadow-sm border-amber-500/20 bg-amber-500/5">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">Pending</span>
             <Clock className="h-4 w-4 text-amber-500" />
           </div>
-          <p className="text-2xl font-black text-foreground tracking-tight">₹{pendingAmount.toLocaleString()}</p>
-          <p className="text-[10px] text-muted-foreground mt-1 font-semibold">{metrics?.referrals.pending || 0} candidates</p>
+          <p className="text-2xl font-black text-foreground tracking-tight">₹{(earnings?.pending || 0).toLocaleString()}</p>
         </div>
         
-        <div className="glass-card rounded-2xl p-4 flex flex-col justify-between shadow-sm touch-target">
+        <div className="glass-card rounded-2xl p-4 flex flex-col justify-between shadow-sm border-blue-500/20 bg-blue-500/5">
            <div className="flex items-center justify-between mb-2">
-             <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Successful</span>
-             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+             <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Approved</span>
+             <CheckCircle2 className="h-4 w-4 text-blue-500" />
            </div>
-           <p className="text-2xl font-black text-foreground tracking-tight">{metrics?.referrals.paid || 0}</p>
-           <p className="text-[10px] text-muted-foreground mt-1 font-semibold">candidates placed</p>
+           <p className="text-2xl font-black text-foreground tracking-tight">₹{(earnings?.approved || 0).toLocaleString()}</p>
+        </div>
+
+        <div className="glass-card rounded-2xl p-4 flex flex-col justify-between shadow-sm border-emerald-500/20 bg-emerald-500/5">
+           <div className="flex items-center justify-between mb-2">
+             <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Paid</span>
+             <Award className="h-4 w-4 text-emerald-500" />
+           </div>
+           <p className="text-2xl font-black text-foreground tracking-tight">₹{(earnings?.paid || 0).toLocaleString()}</p>
+        </div>
+
+        <div className="glass-card rounded-2xl p-4 flex flex-col justify-between shadow-sm border-red-500/20 bg-red-500/5">
+           <div className="flex items-center justify-between mb-2">
+             <span className="text-xs font-bold text-red-600 uppercase tracking-wider">Rejected</span>
+             <X className="h-4 w-4 text-red-500" />
+           </div>
+           <p className="text-2xl font-black text-foreground tracking-tight">₹{(earnings?.rejected || 0).toLocaleString()}</p>
         </div>
       </div>
 
@@ -116,11 +141,15 @@ export function ReferralDashboardView() {
         ) : filteredReferrals.map((ref) => (
           <div key={ref.id} className="relative">
             <div
-              className={cn("glass-card rounded-2xl p-4 flex items-center justify-between z-10 relative shadow-sm", ref.reward_status === 'paid' && ref.payment_reference ? "rounded-b-none border-b-0" : "")}
+              onClick={() => {
+                setEditingReferral(ref as unknown as Referral)
+                setAddSheetOpen(true)
+              }}
+              className={cn("glass-card rounded-2xl p-4 flex items-center justify-between z-10 relative shadow-sm cursor-pointer active:scale-95 transition-transform", ref.status === 'paid' && ref.paid_date ? "rounded-b-none border-b-0" : "")}
             >
               <div className="min-w-0 pr-4">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-lg font-bold text-foreground truncate">{getContactName((ref as any).opportunity?.contact) || 'Unknown'}</span>
+                  <span className="text-lg font-bold text-foreground truncate">{getContactName((ref as any).opportunity?.contact) || 'Unknown Candidate'}</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
                   <ArrowUpRight className="h-3 w-3 text-primary" />
@@ -129,28 +158,45 @@ export function ReferralDashboardView() {
               </div>
 
               <div className="text-right shrink-0">
-                <p className="text-lg font-black text-foreground tracking-tight">₹{ref.reward_amount || 5000}</p>
-                {ref.reward_status === 'paid' ? (
-                  <span className="inline-flex items-center text-[10px] font-bold text-emerald-500 mt-1 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                <p className="text-lg font-black text-foreground tracking-tight">₹{ref.commission_amount || 0}</p>
+                {ref.status === 'paid' ? (
+                  <span className="inline-flex items-center text-[10px] font-bold text-emerald-500 mt-1 bg-emerald-500/10 px-2 py-0.5 rounded-full capitalize">
                     <CheckCircle2 className="h-3 w-3 mr-1" /> Paid
                   </span>
+                ) : ref.status === 'approved' ? (
+                  <span className="inline-flex items-center text-[10px] font-bold text-blue-500 mt-1 bg-blue-500/10 px-2 py-0.5 rounded-full capitalize">
+                    <CheckCircle2 className="h-3 w-3 mr-1" /> Approved
+                  </span>
+                ) : ref.status === 'rejected' ? (
+                  <span className="inline-flex items-center text-[10px] font-bold text-red-500 mt-1 bg-red-500/10 px-2 py-0.5 rounded-full capitalize">
+                    <X className="h-3 w-3 mr-1" /> Rejected
+                  </span>
                 ) : (
-                  <span className="inline-flex items-center text-[10px] font-bold text-amber-500 mt-1 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                  <span className="inline-flex items-center text-[10px] font-bold text-amber-500 mt-1 bg-amber-500/10 px-2 py-0.5 rounded-full capitalize">
                     <Clock className="h-3 w-3 mr-1" /> Pending
                   </span>
                 )}
               </div>
             </div>
-            {ref.reward_status === 'paid' && ref.payment_reference && (
+            {ref.status === 'paid' && ref.paid_date && (
               <div className="bg-muted/30 border-x border-b border-border/50 rounded-b-2xl p-3 text-xs text-muted-foreground relative z-0 font-medium flex items-center justify-between">
-                <span>Ref: <span className="font-mono text-foreground">{ref.payment_reference}</span></span>
-                {ref.notes && <span className="truncate max-w-[50%] text-right">{ref.notes}</span>}
+                <span>Paid Date: <span className="font-mono text-foreground">{ref.paid_date}</span></span>
+                {ref.remarks && <span className="truncate max-w-[50%] text-right">{ref.remarks}</span>}
               </div>
             )}
           </div>
         ))}
       </div>
       </div>
+
+      <AddReferralSheet 
+        open={addSheetOpen} 
+        onClose={() => {
+          setAddSheetOpen(false)
+          setEditingReferral(undefined)
+        }} 
+        existingReferral={editingReferral}
+      />
     </PerformanceProfiler>
   )
 }

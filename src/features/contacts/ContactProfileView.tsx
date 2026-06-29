@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, Phone, MessageCircle, Edit, Calendar,
   FileText, GraduationCap, User,
-  MoreHorizontal, Share2
+  MoreHorizontal, Share2, Award, Users
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -156,6 +156,8 @@ export function ContactProfileView() {
   const activities = [...profile.activities].sort((a, b) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
+  const referredBy = profile.referredBy
+  const referredCandidates = profile.referredCandidates
 
   const initials = contact.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
   const probability = opportunity ? getProbabilityLabel(opportunity.score) : 'Low'
@@ -321,6 +323,73 @@ export function ContactProfileView() {
                       <InfoRow label="Currently Working" value="Yes" />
                       <Separator className="opacity-50" />
                       <InfoRow label="Competitor" value={opportunity.competitor} />
+                    </div>
+                  )}
+
+                  {referredBy && (
+                    <div 
+                      className="glass-card rounded-2xl p-4 cursor-pointer active:scale-95 transition-transform"
+                      onClick={() => navigate(ROUTES.CONTACT_DETAILS.replace(':id', referredBy.referrer_id))}
+                    >
+                      <h3 className="text-xs font-semibold text-primary uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <Award className="h-4 w-4" /> Referred By
+                      </h3>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-bold text-foreground">{(referredBy.referrer as any)?.name || 'Unknown'}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Partner</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-foreground">₹{referredBy.commission_amount}</p>
+                          <span className={cn(
+                            "inline-block px-2 py-0.5 mt-1 rounded-full text-[9px] font-bold uppercase",
+                            referredBy.status === 'paid' ? 'bg-emerald-500/10 text-emerald-500' :
+                            referredBy.status === 'approved' ? 'bg-blue-500/10 text-blue-500' :
+                            referredBy.status === 'rejected' ? 'bg-red-500/10 text-red-500' :
+                            'bg-amber-500/10 text-amber-500'
+                          )}>
+                            {referredBy.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {referredCandidates && referredCandidates.length > 0 && (
+                    <div className="glass-card rounded-2xl p-4">
+                      <h3 className="text-xs font-semibold text-primary uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <Users className="h-4 w-4" /> Referred Candidates
+                      </h3>
+                      <div className="space-y-3">
+                        {referredCandidates.map(ref => (
+                          <div 
+                            key={ref.id} 
+                            className="flex items-center justify-between p-3 rounded-xl bg-muted/50 cursor-pointer active:scale-95 transition-transform"
+                            onClick={() => {
+                              if (ref.candidate_contact_id) {
+                                navigate(ROUTES.CONTACT_DETAILS.replace(':id', ref.candidate_contact_id))
+                              }
+                            }}
+                          >
+                            <div>
+                              <p className="font-bold text-sm text-foreground">{(ref.candidate as any)?.name || 'Unknown Candidate'}</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">{dayjs(ref.referral_date).format('MMM D, YYYY')}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-foreground">₹{ref.commission_amount}</p>
+                              <span className={cn(
+                                "inline-block px-2 py-0.5 mt-1 rounded-full text-[9px] font-bold uppercase",
+                                ref.status === 'paid' ? 'bg-emerald-500/10 text-emerald-500' :
+                                ref.status === 'approved' ? 'bg-blue-500/10 text-blue-500' :
+                                ref.status === 'rejected' ? 'bg-red-500/10 text-red-500' :
+                                'bg-amber-500/10 text-amber-500'
+                              )}>
+                                {ref.status}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

@@ -16,10 +16,11 @@ export function useReferrals() {
         .from('referrals')
         .select(`
           id,
-          reward_amount,
-          reward_status,
-          payment_reference,
-          notes,
+          status,
+          commission_amount,
+          paid_date,
+          remarks,
+          referral_date,
           created_at,
           referrer:referrer_id(name),
           opportunity:opportunity_id(contact:contact_id(name))

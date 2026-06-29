@@ -1,6 +1,5 @@
 import { createRoot } from 'react-dom/client'
 
-console.log('BOOT TRACE: main.tsx Step 1 started (React only)');
 
 const root = document.getElementById('root')!
 

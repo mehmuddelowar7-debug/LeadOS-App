@@ -20,7 +20,6 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 dayjs.extend(relativeTime)
 
 export function DashboardView() {
-  console.log('BOOT TRACE: 11. Dashboard mounted');
   const navigate = useAppNavigate()
   const user = useAuthStore(state => state.user)
   const openSearch = useSearchStore(state => state.openSearch)
@@ -185,7 +184,7 @@ export function DashboardView() {
       <div className="fixed-bottom-safe left-4 right-4 md:left-auto md:right-6 md:w-14">
         <motion.button
           whileTap={{ scale: 0.95 }}
-          onClick={() => navigate('/contacts/new?mode=quick')}
+          onClick={() => navigate(ROUTES.QUICK_CAPTURE)}
           className="w-full h-16 md:w-14 md:h-14 rounded-2xl md:rounded-full bg-primary text-primary-foreground shadow-2xl shadow-primary/30 flex items-center justify-center font-black text-xl touch-target"
         >
           <Plus className="h-7 w-7 md:mr-0 mr-2 stroke-[3]" /> <span className="md:hidden">QUICK CAPTURE</span>

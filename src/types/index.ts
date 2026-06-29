@@ -19,7 +19,7 @@ export const CONTACT_ROLES = [
 ] as const
 export type ContactRole = typeof CONTACT_ROLES[number]
 
-export const REFERRAL_STATUSES = ['pending', 'successful', 'rejected'] as const
+export const REFERRAL_STATUSES = ['pending', 'approved', 'paid', 'rejected'] as const
 export type ReferralStatus = typeof REFERRAL_STATUSES[number]
 
 export const REWARD_STATUSES = ['pending', 'paid'] as const
@@ -191,6 +191,9 @@ export interface Contact {
   notes: string | null
   custom_fields: Record<string, unknown>
 
+  // V1.1: Backdated entry support
+  entry_date?: string
+
   is_deleted: boolean
   deleted_at: string | null
   created_at: string
@@ -258,14 +261,25 @@ export interface Referral {
   workspace_id: string
   referrer_id: string
   opportunity_id: string
+  candidate_contact_id: string | null
 
   status: ReferralStatus
   reward_amount: number
   reward_status: RewardStatus
   payment_date: string | null
 
+  // V1.1: Flexible commission tracking
+  commission_amount: number
+  paid_date: string | null
+  remarks: string | null
+  referral_date: string | null
+
   created_at: string
   updated_at: string
+
+  // Relations (populated by joins)
+  referrer?: { name: string } | { name: string }[]
+  candidate?: { name: string } | { name: string }[]
 }
 
 export interface ContactService {
@@ -293,6 +307,8 @@ export interface ContactActivity {
   metadata: Record<string, unknown>
   created_by: string
   created_at: string
+  // V1.1: Backdated activity support
+  activity_date?: string
 }
 
 
