@@ -4,6 +4,7 @@ import { useImportStore } from './store/importStore'
 import { UploadStep } from './components/UploadStep'
 import { MappingStep } from './components/MappingStep'
 import { DuplicateSettingsStep } from './components/DuplicateSettingsStep'
+import { DryRunStep } from './components/DryRunStep'
 import { ProgressStep } from './components/ProgressStep'
 import { ReportStep } from './components/ReportStep'
 
@@ -11,6 +12,7 @@ const STEPS = [
   { id: 'upload', icon: FileUp, label: 'Upload' },
   { id: 'mapping', icon: ListChecks, label: 'Map Columns' },
   { id: 'duplicate_settings', icon: Database, label: 'Duplicates' },
+  { id: 'dry_run', icon: CheckCircle, label: 'Dry Run' },
   { id: 'progress', icon: Play, label: 'Import' },
   { id: 'report', icon: CheckCircle, label: 'Report' }
 ]
@@ -70,6 +72,7 @@ export function ImportWizardView() {
             {step === 'upload' && <UploadStep />}
             {step === 'mapping' && <MappingStep />}
             {step === 'duplicate_settings' && <DuplicateSettingsStep />}
+            {step === 'dry_run' && <DryRunStep />}
             {step === 'progress' && <ProgressStep />}
             {step === 'report' && <ReportStep />}
           </motion.div>

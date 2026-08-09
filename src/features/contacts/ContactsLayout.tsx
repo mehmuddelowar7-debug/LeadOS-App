@@ -2,6 +2,7 @@ import { Routes, Route, useLocation } from "react-router"
 import { ContactsView } from "./ContactsView"
 import { ContactProfileView } from "./ContactProfileView"
 import { ImportWizardView } from "@/features/imports/ImportWizardView"
+import { ImportAuditView } from "@/features/imports/components/ImportAuditView"
 import { cn } from "@/lib/utils"
 
 export function ContactsLayout() {
@@ -34,6 +35,7 @@ export function ContactsLayout() {
           {isDetailView ? (
             <Routes>
               <Route path="/contacts/import" element={<ImportWizardView />} />
+              <Route path="/contacts/import/audit" element={<ImportAuditView />} />
               <Route path="/contacts/:id" element={<ContactProfileView />} />
             </Routes>
           ) : (

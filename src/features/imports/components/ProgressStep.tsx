@@ -6,10 +6,11 @@ import { normalizePhone, normalizeString, normalizeDate } from '@/lib/importer/n
 import { mapPipelineStage, mapSource, mapConnectionStatus, mapCandidateCategory } from '@/lib/importer/enumMappings'
 import { supabase } from '@/lib/supabase/client'
 import { useAuthStore } from '@/features/auth/store/authStore'
+import { buildPayload } from '@/lib/importer/payloadBuilder'
 
 export function ProgressStep() {
   const { 
-    rawData, mappings, setStep, 
+    rawData, mappings, setStep, file, setSessionId,
     incrementImported, incrementSkipped, addFailedRow,
     importedCount, skippedCount, failedCount 
   } = useImportStore()
@@ -35,6 +36,44 @@ export function ProgressStep() {
       setIsProcessing(false)
       setStep('report')
       return
+    }
+
+    const startTime = Date.now()
+
+    // 1. Create Import Session
+    const { data: sessionData, error: sessionError } = await supabase
+      .from('import_sessions')
+      .insert({
+        workspace_id: workspace.id,
+        uploaded_by: session.user.id,
+        filename: file?.name || 'historical_import.csv',
+        total_rows: rawData.length,
+        status: 'processing'
+      })
+      .select()
+      .single()
+
+    if (sessionError || !sessionData) {
+      addFailedRow({}, 'Failed to create import session: ' + sessionError?.message)
+      setIsProcessing(false)
+      setStep('report')
+      return
+    }
+    
+    const sid = sessionData.id
+    setSessionId(sid)
+    
+    // 2. Upload file securely
+    if (file) {
+      const filePath = `${workspace.id}/${sid}_${file.name}`
+      const { error: uploadError } = await supabase.storage
+        .from('historical_imports')
+        .upload(filePath, file)
+        
+      if (!uploadError) {
+        const { data: { publicUrl } } = supabase.storage.from('historical_imports').getPublicUrl(filePath)
+        await supabase.from('import_sessions').update({ file_url: publicUrl }).eq('id', sid)
+      }
     }
 
     const BATCH_SIZE = 100
@@ -76,6 +115,7 @@ export function ProgressStep() {
 
       if (batchPayload.length > 0) {
         const { data, error } = await supabase.rpc('import_historical_batch_v3', {
+          p_session_id: sid,
           batch_payload: batchPayload
         })
 
@@ -104,112 +144,27 @@ export function ProgressStep() {
     }
     
     setIsProcessing(false)
+    
+    // Update session stats
+    const duration = Date.now() - startTime
+    
+    // We use the current counts from state by trusting the final processed counts
+    // However, Zustand state might not be instantly available here due to closures.
+    // So we'll track locally to be safe.
+    
+    // Actually, to be accurate, we can wait a bit or use the store in a subsequent effect, 
+    // but a DB count is safer or tracking them locally. Let's do a simple count query on contacts.
+    
     setTimeout(() => {
+      // Just update status to completed and duration
+      supabase.from('import_sessions').update({ 
+        status: 'completed',
+        duration_ms: duration,
+        updated_at: new Date().toISOString()
+      }).eq('id', sid).then()
+      
       setStep('report')
     }, 1000)
-  }
-
-  const buildPayload = (row: any, mapConfig: ColumnMapping[], workspaceId: string, userId: string) => {
-    // Construct the JSON structure required by the RPC
-    const result: any = {
-      workspace_id: workspaceId,
-      created_by: userId,
-      custom_fields: {},
-      opportunity: {},
-      activities: []
-    }
-
-    // Default historical activity
-    const nowStr = new Date().toISOString()
-    let hasExplicitDate = false
-
-    mapConfig.forEach(m => {
-      if (!m.dbField) return
-      
-      const rawVal = row[m.sheetColumn]
-      if (rawVal === undefined || rawVal === null || rawVal === '') return
-
-      if (m.dbField === 'phone') result.phone = normalizePhone(rawVal)
-      else if (m.dbField === 'whatsapp') result.whatsapp = normalizePhone(rawVal)
-      else if (m.dbField === 'name') result.name = normalizeString(rawVal)
-      else if (m.dbField === 'created_at') {
-        const d = normalizeDate(rawVal)
-        if (d) {
-          result.created_at = d
-          hasExplicitDate = true
-        }
-      }
-      else if (m.dbField === 'age') result.age = parseInt(rawVal) || null
-      else if (m.dbField === 'gender') {
-        const g = normalizeString(rawVal)?.toLowerCase()
-        if (g?.startsWith('m')) result.gender = 'male'
-        else if (g?.startsWith('f')) result.gender = 'female'
-        else result.gender = 'other'
-      }
-      else if (m.dbField === 'connection_status') result.connection_status = mapConnectionStatus(rawVal)
-      else if (m.dbField === 'origin') result.origin = mapSource(rawVal)
-      else if (m.dbField === 'current_area') result.current_area = normalizeString(rawVal)
-      else if (m.dbField === 'notes') result.notes = normalizeString(rawVal)
-      
-      // Direct Contact fields
-      else if (m.dbField === 'hometown') result.hometown = normalizeString(rawVal)
-      else if (m.dbField === 'currently_in_bangalore') {
-        const val = String(rawVal).toLowerCase().trim()
-        result.currently_in_bangalore = val === 'yes' || val === 'true' || val === '1'
-      }
-      else if (m.dbField === 'bangalore_tenure') result.bangalore_tenure = normalizeString(rawVal)
-      else if (m.dbField === 'education') result.education = normalizeString(rawVal)
-      else if (m.dbField === 'current_occupation') result.current_occupation = normalizeString(rawVal)
-      else if (m.dbField === 'current_salary') result.current_salary = parseInt(String(rawVal).replace(/\D/g, '')) || 0
-      else if (m.dbField === 'total_experience') result.total_experience = parseInt(rawVal) || 0
-      
-      // Opportunity (Using new JSON struct if needed, but the RPC expects them at root or opportunity)
-      else if (m.dbField === 'opportunity.highest_qualification') result.education = normalizeString(rawVal) // Fallback mapping
-      else if (m.dbField === 'opportunity.current_occupation') result.current_occupation = normalizeString(rawVal) // Fallback mapping
-      else if (m.dbField === 'opportunity.current_salary') result.current_salary = parseInt(String(rawVal).replace(/\D/g, '')) || 0 // Fallback mapping
-      else if (m.dbField === 'opportunity.total_experience') result.total_experience = parseInt(rawVal) || 0 // Fallback mapping
-      else if (m.dbField === 'opportunity.status') result.opportunity.pipeline_stage = mapPipelineStage(rawVal)
-      else if (m.dbField === 'opportunity.candidate_category') result.opportunity.candidate_category = mapCandidateCategory(rawVal)
-      
-      // Dates
-      else if (m.dbField === 'follow_up_date') result.follow_up_date = normalizeDate(rawVal)
-      else if (m.dbField === 'walkin_date') result.walkin_date = normalizeDate(rawVal)
-      else if (m.dbField === 'walkin_attended') {
-        const val = String(rawVal).toLowerCase().trim()
-        result.walkin_attended = val === 'yes' || val === 'true' || val === '1'
-      }
-      
-      // Finance
-      else if (m.dbField.startsWith('finance.')) {
-        if (!result.finance) result.finance = {}
-        const fieldName = m.dbField.replace('finance.', '')
-        
-        if (fieldName === 'pr_done' || fieldName === 'agent_referral') {
-          const val = String(rawVal).toLowerCase().trim()
-          result.finance[fieldName] = val === 'yes' || val === 'true' || val === '1' || val === 'done'
-        } else {
-          result.finance[fieldName] = parseFloat(String(rawVal).replace(/,/g, '')) || 0
-        }
-      }
-    })
-
-    // Generate timeline
-    const createdDate = result.created_at || nowStr
-    result.activities.push({
-      type: 'note',
-      created_at: createdDate,
-      content: 'Imported from historical spreadsheet data.'
-    })
-
-    if (result.walkin_date) {
-      result.activities.push({
-        type: 'interview_scheduled',
-        created_at: createdDate,
-        content: `Walk-in historically scheduled for ${new Date(result.walkin_date).toLocaleDateString()}`
-      })
-    }
-
-    return result
   }
 
   return (

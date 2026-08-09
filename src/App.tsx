@@ -164,7 +164,7 @@ function App() {
                   {/* ── Core Routes ── */}
                   <Route path={ROUTES.HOME} element={<OperationsCenterView />} />
                   <Route path={`${ROUTES.PIPELINE}/*`} element={<PipelineLayout />} />
-                  <Route path={ROUTES.CONTACTS} element={<ContactsLayout />} />
+                  <Route path={`${ROUTES.CONTACTS}/*`} element={<ContactsLayout />} />
                   <Route path={ROUTES.MARKETING} element={<MarketingLayout />}>
                     <Route index element={<MarketingHomeView />} />
                     <Route path="imports" element={<MarketingImportsView />} />

@@ -66,8 +66,8 @@ export function DuplicateSettingsStep() {
         <Button variant="outline" onClick={() => setStep('mapping')}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
-        <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setStep('progress')}>
-          Start Import <Play className="ml-2 h-4 w-4" />
+        <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setStep('dry_run')}>
+          Run Validation <Play className="ml-2 h-4 w-4" />
         </Button>
       </div>
     </div>
