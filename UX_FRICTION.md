@@ -4,16 +4,15 @@ During the Field Trial, log any moment a recruiter hesitates, gets confused, or 
 
 ---
 
-### Template
-**ID:** UX-000
-**Workflow:** [e.g., Quick Capture]
-**Objective:** [What was the user trying to do?]
-**Observation:** [What actually happened? e.g., Searched for edit button for 8 seconds]
-**Pain:** [Why did it hurt? e.g., Unsure if candidate could be modified]
-**Time Lost:** [e.g., 8 seconds]
-**Frequency:** [e.g., Every candidate]
-**Severity:** [Low / Medium / High / Critical]
-**Suggested Fix:** [e.g., Show edit action immediately after save]
-**Validated:** No
+### UX-001
+**Workflow:** Candidate Profile
+**Objective:** Access secondary actions (Edit, Schedule)
+**Observation:** In desktop view, the candidate info bar stretches full screen, making the Call/WhatsApp/SMS buttons massive and squishing the Edit/Delete/Schedule buttons.
+**Pain:** Looks unprofessional and makes the smaller icon buttons hard to hit.
+**Time Lost:** ~3 seconds of visual search
+**Frequency:** Every candidate profile open on desktop
+**Severity:** Medium
+**Suggested Fix:** Constrain the action bar width on desktop and center it.
+**Validated:** Yes (Fixed in v1.0.1 hotfix)
 
 ---
