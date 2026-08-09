@@ -6,6 +6,7 @@ export const ROUTES = {
   HOME: "/",
   PIPELINE: "/pipeline",
   CONTACTS: "/contacts",
+  CONTACTS_IMPORT: "/contacts/import",
   MARKETING: "/marketing",
   MARKETING_DETAIL: "/marketing/:id",
   PROFILE: "/profile",

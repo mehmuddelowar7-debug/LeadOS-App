@@ -2,7 +2,7 @@ import { useAppNavigate } from '@/lib/routes'
 import { useState, useRef, memo, useMemo, useCallback } from 'react'
 import { PerformanceProfiler } from '@/components/dev/PerformanceProfiler'
 import { useRenderProfiler } from '@/hooks/useRenderProfiler'
-import { Search, UserPlus, Download, Phone, MessageCircle, CheckSquare, Square, Trash2, Calendar, PhoneOutgoing, CheckCircle } from 'lucide-react'
+import { Search, UserPlus, Download, Phone, MessageCircle, CheckSquare, Square, Trash2, Calendar, PhoneOutgoing, CheckCircle, Upload } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { CONTACT_ROLES, type ContactRole, type Contact } from '@/types'
@@ -349,6 +349,13 @@ export function ContactsView() {
             title="Export Contacts"
           >
             <Download className="h-5 w-5" />
+          </button>
+          <button 
+            onClick={() => navigate('/contacts/import')}
+            className="h-12 w-12 flex items-center justify-center bg-emerald-500/10 text-emerald-600 rounded-2xl hover:bg-emerald-500/20 transition-colors touch-target"
+            title="Import Historical Data"
+          >
+            <Upload className="h-5 w-5" />
           </button>
           <button 
             onClick={() => navigate('/contacts/new?mode=quick')}
