@@ -43,3 +43,6 @@ Before any major feature goes to real users, it must be used by the team interna
 
 ## 14. Continuous Clarity
 **A recruiter should never wonder "What do I do next?"** Every screen must proactively answer this question. Reduce thinking, not just clicking.
+
+## 15. One Click Forward
+**Every primary workflow should end by naturally suggesting the next logical action.** Never leave the recruiter at a dead end. When a call finishes, prompt for a follow-up. When an interview completes, prompt for the next stage. Every action leads to the next.
