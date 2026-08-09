@@ -31,3 +31,12 @@ Recruiters work on the go. Touch targets must be generous, and the interface mus
 
 ## 10. Dogfood Before Deploy
 Before any major feature goes to real users, it must be used by the team internally for at least a day to uncover the UX friction that automated tests cannot catch.
+
+## 11. Production Evidence
+**Nothing is complete until it passes against the live environment.** A successful build, unit test, or mock response is not evidence of production readiness. Every critical workflow must be validated against the live backend.
+
+## 12. Fail Gracefully
+**Infrastructure failures must never become user failures.** If AI, Realtime, Analytics, or Webhooks are unavailable, RecruitOS must continue functioning as a CRM with clear, non-technical messaging.
+
+## 13. One Source of Truth
+**Every business rule exists in exactly one place.** Avoid duplicating workflow logic between the frontend, backend, AI prompts, and SQL. Business rules should be centralized and reused.
