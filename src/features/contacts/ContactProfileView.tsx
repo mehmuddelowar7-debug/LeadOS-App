@@ -548,22 +548,22 @@ export function ContactProfileView() {
       </div>
 
       {/* Sticky Bottom Action Bar */}
-      <div className="fixed-bottom-safe left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-max md:px-4 z-50 bg-background/80 backdrop-blur-md p-2 rounded-[24px] border shadow-2xl flex gap-2">
+      <div className="fixed-bottom-safe left-4 right-4 md:static md:sticky md:bottom-4 md:mt-auto md:w-full z-50 bg-background/80 backdrop-blur-md p-2 rounded-[24px] border shadow-2xl flex gap-2">
         <Button
-          className="flex-1 md:flex-none md:w-[140px] min-h-[52px] rounded-[16px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm"
+          className="flex-1 min-h-[52px] rounded-[16px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm"
           onClick={handleCall}
         >
           <Phone className="h-5 w-5 mr-1.5" /> Call
         </Button>
         <Button
-          className="flex-1 md:flex-none md:w-[140px] min-h-[52px] rounded-[16px] bg-emerald-500 hover:bg-emerald-600 text-white font-bold shadow-sm"
+          className="flex-1 min-h-[52px] rounded-[16px] bg-emerald-500 hover:bg-emerald-600 text-white font-bold shadow-sm"
           onClick={() => setWhatsappSheetOpen(true)}
         >
           <MessageCircle className="h-5 w-5 mr-1.5" /> WhatsApp
         </Button>
         <a
           href={`sms:${contact.phone}`}
-          className="flex-1 md:flex-none md:w-[140px] min-h-[52px] rounded-[16px] bg-blue-500 hover:bg-blue-600 text-white font-bold shadow-sm inline-flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex-1 min-h-[52px] rounded-[16px] bg-blue-500 hover:bg-blue-600 text-white font-bold shadow-sm inline-flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           onClick={() => logActivity(contact.id, 'sms', 'Sent SMS via action bar')}
         >
           <MessageSquare className="h-5 w-5 mr-1.5" /> SMS
