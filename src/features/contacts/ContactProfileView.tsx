@@ -216,6 +216,50 @@ export function ContactProfileView() {
             </div>
           </div>
 
+          {/* Inline Action Bar */}
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <Button
+              className="flex-1 min-w-[90px] h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm"
+              onClick={handleCall}
+            >
+              <Phone className="h-4 w-4 mr-1.5" /> Call
+            </Button>
+            <Button
+              className="flex-1 min-w-[90px] h-11 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold shadow-sm"
+              onClick={() => setWhatsappSheetOpen(true)}
+            >
+              <MessageCircle className="h-4 w-4 mr-1.5" /> WhatsApp
+            </Button>
+            <a
+              href={`sms:${contact.phone}`}
+              className="flex-1 min-w-[90px] h-11 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold shadow-sm inline-flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              onClick={() => logActivity(contact.id, 'sms', 'Sent SMS via action bar')}
+            >
+              <MessageSquare className="h-4 w-4 mr-1.5" /> SMS
+            </a>
+            <Button
+              variant="outline"
+              className="w-11 h-11 rounded-xl p-0 shrink-0 bg-background shadow-sm border-violet-500/20 text-violet-500 hover:bg-violet-500/10"
+              onClick={() => setFollowUpSheetOpen(true)}
+            >
+              <Calendar className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              className="w-11 h-11 rounded-xl p-0 shrink-0 bg-background shadow-sm"
+              onClick={() => setEditSheetOpen(true)}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              className="w-11 h-11 rounded-xl p-0 shrink-0 bg-background shadow-sm"
+              onClick={() => setActionsSheetOpen(true)}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </div>
+
           {opportunity && (
             <div className="mt-5 space-y-3">
               <div className="glass-card rounded-xl p-3 flex items-center justify-between">
@@ -545,50 +589,6 @@ export function ContactProfileView() {
             </motion.div>
           </AnimatePresence>
         </div>
-      </div>
-
-      {/* Sticky Bottom Action Bar */}
-      <div className="fixed-bottom-safe left-4 right-4 md:static md:sticky md:bottom-4 md:mt-auto md:w-full z-50 bg-background/80 backdrop-blur-md p-2 rounded-[24px] border shadow-2xl flex gap-2">
-        <Button
-          className="flex-1 min-h-[52px] rounded-[16px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm"
-          onClick={handleCall}
-        >
-          <Phone className="h-5 w-5 mr-1.5" /> Call
-        </Button>
-        <Button
-          className="flex-1 min-h-[52px] rounded-[16px] bg-emerald-500 hover:bg-emerald-600 text-white font-bold shadow-sm"
-          onClick={() => setWhatsappSheetOpen(true)}
-        >
-          <MessageCircle className="h-5 w-5 mr-1.5" /> WhatsApp
-        </Button>
-        <a
-          href={`sms:${contact.phone}`}
-          className="flex-1 min-h-[52px] rounded-[16px] bg-blue-500 hover:bg-blue-600 text-white font-bold shadow-sm inline-flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          onClick={() => logActivity(contact.id, 'sms', 'Sent SMS via action bar')}
-        >
-          <MessageSquare className="h-5 w-5 mr-1.5" /> SMS
-        </a>
-        <Button
-          variant="outline"
-          className="w-[52px] min-h-[52px] rounded-[16px] p-0 shrink-0 bg-background shadow-sm"
-          onClick={() => setFollowUpSheetOpen(true)}
-        >
-          <Calendar className="h-5 w-5 text-violet-500" />
-        </Button>
-        <Button
-          variant="outline"
-          className="w-[52px] min-h-[52px] rounded-[16px] p-0 shrink-0 bg-background shadow-sm"
-          onClick={() => setEditSheetOpen(true)}
-        >
-          <Edit className="h-5 w-5" />
-        </Button>
-        <Button
-          variant="outline"
-          className="w-[52px] min-h-[52px] rounded-[16px] p-0 shrink-0 bg-background shadow-sm"
-          onClick={() => setActionsSheetOpen(true)}
-        >
-          <MoreHorizontal className="h-5 w-5" />
-        </Button>
       </div>
 
       <CallLogSheet

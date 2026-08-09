@@ -6,13 +6,13 @@ During the Field Trial, log any moment a recruiter hesitates, gets confused, or 
 
 ### UX-001
 **Workflow:** Candidate Profile
-**Objective:** Access secondary actions (Edit, Schedule)
-**Observation:** In desktop view, the candidate info bar stretches full screen, making the Call/WhatsApp/SMS buttons massive and squishing the Edit/Delete/Schedule buttons.
-**Pain:** Looks unprofessional and makes the smaller icon buttons hard to hit.
-**Time Lost:** ~3 seconds of visual search
-**Frequency:** Every candidate profile open on desktop
+**Objective:** Access primary/secondary actions (Call, Edit, Schedule)
+**Observation:** Action bar floats at the bottom of the screen instead of feeling like part of the candidate profile.
+**Pain:** Looks disconnected from the candidate context. Takes up screen real estate and makes desktop layout feel like a mobile app stretched out.
+**Time Lost:** Cognitive disconnect
+**Frequency:** Every candidate profile open
 **Severity:** Medium
-**Suggested Fix:** Constrain the action bar width on desktop and center it.
+**Suggested Fix:** Move the action bar inline, directly below the candidate's name and tags in the profile header.
 **Validated:** Yes (Fixed in v1.0.1 hotfix)
 
 ---
