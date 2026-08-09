@@ -46,3 +46,12 @@ Before any major feature goes to real users, it must be used by the team interna
 
 ## 15. One Click Forward
 **Every primary workflow should end by naturally suggesting the next logical action.** Never leave the recruiter at a dead end. When a call finishes, prompt for a follow-up. When an interview completes, prompt for the next stage. Every action leads to the next.
+
+## 16. The Truth Lives in the Database
+**Never assume the frontend is correct. The database is the final authority.** Schema drift, RLS failures, and enum mismatches always disguise themselves as frontend bugs. Centralize validation in Postgres.
+
+## 17. Observe Before Optimizing
+**Never optimize a workflow that hasn't been observed in real use.** Do not build features because they sound useful. Watch recruiters work. The friction they experience is the only optimization backlog that matters.
+
+## 18. Trust Must Be Earned
+**The fastest way to kill a CRM is making users verify everything manually.** Totals must be correct. Timelines must never lose history. Duplicate detection must never lie. No phantom success. No silent failures. Let users stop checking the software so they can focus on their work.
