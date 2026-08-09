@@ -1,12 +1,11 @@
 import { motion } from 'framer-motion'
 import { useAppNavigate } from '@/lib/routes'
 import {
-  Sun, Moon, LogOut, ChevronRight, Shield, Bell,
+  LogOut, ChevronRight, Shield, Bell,
   Download, Trophy, Zap, Flame, Target, BrainCircuit, Bug
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { useTheme } from '@/components/theme-provider'
 import { useAuthStore } from '@/features/auth/AuthStore'
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics'
 import { cn } from '@/lib/utils'
@@ -32,7 +31,7 @@ const LEVEL_CONFIG = {
 // Profile View
 // ============================================================================
 export function ProfileView() {
-  const { theme, setTheme } = useTheme()
+  // Theme locked to dark
   const signOut = useAuthStore(state => state.signOut)
   const user = useAuthStore(state => state.user)
   const { data: metrics } = useDashboardMetrics()
@@ -68,11 +67,6 @@ export function ProfileView() {
     { icon: Bug, label: 'Report Issue', onClick: () => setBugReportOpen(true) },
     { icon: Shield, label: 'Privacy & Security', onClick: () => {} },
     { icon: Download, label: 'Data Management (Import/Export)', onClick: () => setDataManagementOpen(true) },
-    {
-      icon: theme === 'dark' ? Sun : Moon,
-      label: theme === 'dark' ? 'Light Mode' : 'Dark Mode',
-      onClick: () => setTheme(theme === 'dark' ? 'light' : 'dark'),
-    },
   ]
 
   return (
@@ -108,7 +102,7 @@ export function ProfileView() {
               className="h-full bg-primary rounded-full"
               initial={{ width: 0 }}
               animate={{ width: `${Math.min(progressToNext, 100)}%` }}
-              transition={{ duration: 0.8, delay: 0.3 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 100, delay: 0.1 }}
             />
           </div>
         </div>

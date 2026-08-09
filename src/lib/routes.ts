@@ -2,23 +2,23 @@ import { useNavigate } from 'react-router';
 import type { NavigateOptions, To } from 'react-router';
 
 export const ROUTES = {
+  // === Primary Navigation (RecruitOS V1) ===
   HOME: "/",
-  AUTH: "/auth",
+  PIPELINE: "/pipeline",
   CONTACTS: "/contacts",
-  CONTACT_DETAILS: "/contacts/:id", // Use dynamic matching in components, but careful when navigating directly
+  MARKETING: "/marketing",
+  MARKETING_DETAIL: "/marketing/:id",
+  PROFILE: "/profile",
+
+  // === Secondary / Deep Links ===
+  AUTH: "/auth",
+  CONTACT_DETAILS: "/contacts/:id",
   CONTACTS_NEW: "/contacts/new",
   QUICK_CAPTURE: "/capture",
-  REFERRALS: "/referrals",
-  INSIGHTS: "/insights",
-  PROFILE: "/profile",
-  SETTINGS: "/settings",
   ANALYTICS: "/analytics",
-  INCENTIVES: "/incentives",
-  QUEUE: "/queue",
-  QUEUE_CALLS: "/queue/calls",
-  QUEUE_WHATSAPP: "/queue/whatsapp",
-  QUEUE_PENDING: "/queue/pending",
-  HEALTH: "/health"
+  HEALTH: "/health",
+  SYSTEM: "/system",
+
 } as const;
 
 export type RouteKey = keyof typeof ROUTES;

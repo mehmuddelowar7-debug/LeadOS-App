@@ -75,8 +75,9 @@ export type SupportStatus = typeof SUPPORT_OPTIONS[number]
 export const INTEREST_LEVELS = ['very_interested', 'interested', 'maybe', 'not_interested'] as const
 export type InterestLevel = typeof INTEREST_LEVELS[number]
 
-export const CONTACT_SOURCES = ['walk_in', 'referral', 'instagram', 'facebook', 'whatsapp', 'friend', 'other'] as const
+export const CONTACT_SOURCES = ['walk_in', 'referral', 'instagram', 'facebook', 'whatsapp', 'meta_lead', 'google', 'other'] as const
 export type ContactSource = typeof CONTACT_SOURCES[number]
+
 
 export const CALL_OUTCOMES = ['interested', 'busy', 'no_answer', 'call_later', 'wrong_number'] as const
 export type CallOutcome = typeof CALL_OUTCOMES[number]
@@ -160,7 +161,14 @@ export interface WorkspaceMember {
   workspace_id: string
   user_id: string
   role: 'owner' | 'admin' | 'member'
-  daily_target: number
+  // Targets (V1.2)
+  target_leads: number
+  target_calls: number
+  target_interviews: number
+  target_walkins: number
+  target_recharges: number
+  target_trainings: number
+  target_activations: number
   created_at: string
 }
 
@@ -268,12 +276,15 @@ export interface Referral {
   reward_status: RewardStatus
   payment_date: string | null
 
-  // V1.1: Flexible commission tracking
-  commission_amount: number
-  paid_date: string | null
-  remarks: string | null
-  referral_date: string | null
-
+  // V1.1:  candidate_contact_id?: string
+  commission_amount?: number
+  paid_date?: string
+  remarks?: string
+  referral_date?: string
+  approved_by?: string
+  approved_date?: string
+  payment_method?: string
+  commission_reason?: string
   created_at: string
   updated_at: string
 
@@ -335,6 +346,43 @@ export interface UserProfile {
   badges: string[]
   created_at: string
   updated_at: string
+}
+
+// =============================================================================
+// V1.2 FIELD RECRUITER TYPES
+// =============================================================================
+
+export interface Interview {
+  id: string
+  workspace_id: string
+  contact_id: string
+  created_by: string
+  interview_date: string
+  interview_time: string
+  location: string | null
+  branch: string | null
+  status: 'scheduled' | 'attended' | 'no_show' | 'rescheduled' | 'cancelled'
+  notes: string | null
+  created_at: string
+  updated_at: string
+  
+  contact?: { name: string, phone: string }
+}
+
+export interface FollowUp {
+  id: string
+  workspace_id: string
+  contact_id: string
+  created_by: string
+  follow_up_date: string
+  follow_up_time: string | null
+  reminder: string | null
+  priority: Priority
+  status: 'pending' | 'completed' | 'missed'
+  created_at: string
+  updated_at: string
+  
+  contact?: { name: string, phone: string }
 }
 
 // =============================================================================

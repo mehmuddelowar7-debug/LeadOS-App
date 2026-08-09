@@ -107,7 +107,7 @@ export function WhatsAppSheet({ open, onClose, lead }: WhatsAppSheetProps) {
                         <Copy className="h-3 w-3" /> Copy
                       </Button>
                       <Button
-                        className="flex-1 h-9 rounded-xl text-xs gap-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-white"
+                        className="flex-1 h-9 rounded-xl text-xs gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white"
                         onClick={() => handleSend(text)}
                       >
                         <Send className="h-3 w-3" /> Send

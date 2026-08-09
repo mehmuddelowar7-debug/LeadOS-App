@@ -1,7 +1,7 @@
 import { Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import { useLocation, Outlet } from 'react-router'
-import { DashboardView } from '@/features/dashboard/DashboardView'
+import { OperationsCenterView } from '@/features/operations/OperationsCenterView'
 import { ContactsLayout } from '@/features/contacts/ContactsLayout'
 import { ReferralDashboardView } from '@/features/referrals/ReferralDashboardView'
 import { AlertTriangle } from 'lucide-react'
@@ -40,7 +40,7 @@ function KeepAliveTabsInner() {
   return (
     <>
       <div className={isHomeActive ? 'block h-full w-full' : 'hidden'}>
-        <DashboardView />
+        <OperationsCenterView />
       </div>
       <div className={isContactsActive ? 'block h-full w-full' : 'hidden'}>
         <ContactsLayout />

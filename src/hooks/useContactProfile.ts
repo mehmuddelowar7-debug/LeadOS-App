@@ -15,53 +15,84 @@ export function useContactProfile(id?: string) {
     queryFn: async () => {
       if (!id) throw new Error('No contact ID provided')
 
-      // Fetch contact
+      // ── REQUIRED: Fetch the contact itself ────────────────────────────────
+      // This is the only query allowed to fail the entire hook.
+      // If the contact doesn't exist or RLS rejects, show "Contact not found."
       const { data: contact, error: contactError } = await supabase
         .from('contacts')
-        .select('id, workspace_id, name, phone, whatsapp, age, gender, photo_url, roles, labels, origin, native_language, current_area, location_lat, location_lng, address, english_level, interview_ready, doc_status, support_status, interest_level, current_salary, expected_salary, created_at, created_by')
+        .select('id, workspace_id, name, phone, whatsapp, age, gender, photo_url, roles, labels, origin, native_language, current_area, location_lat, location_lng, source, notes, is_deleted, created_at, updated_at, created_by')
         .eq('id', id)
         .single()
 
-      if (contactError) throw contactError
+      if (contactError || !contact) {
+        console.error('Contact profile load failed:', { id, contactError, contact })
+        throw contactError ?? new Error('Contact not found')
+      }
 
-      // Fetch opportunity
-      const { data: opportunity } = await supabase
-        .from('opportunities')
-        .select('id, workspace_id, contact_id, type_id, status, expected_walkin_date, next_followup, score, notes, created_at, created_by')
-        .eq('contact_id', id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
+      // ── OPTIONAL: run in parallel, individually fault-tolerant ───────────
+      // Promise.allSettled guarantees all four resolve even if one fails.
+      // A failed optional query returns null / [] — never crashes the profile.
+      const [
+        opportunityResult,
+        activitiesResult,
+        referredByResult,
+        referredCandidatesResult,
+      ] = await Promise.allSettled([
+        // Optional: new contacts have no opportunity yet
+        supabase
+          .from('opportunities')
+          .select('id, workspace_id, contact_id, type_id, status, priority, score, score_label, education, english_level, interview_ready, experience, interest_level, parents_support, family_support, spouse_support, expected_walkin_date, next_followup, notes, current_salary, expected_salary, expected_benefits, created_at, updated_at, created_by')
+          .eq('contact_id', id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
 
-      // Fetch activities
-      const { data: activities = [] } = await supabase
-        .from('contact_activities')
-        .select('id, workspace_id, contact_id, type, details, created_at, created_by, activity_date')
-        .eq('contact_id', id)
-        .order('created_at', { ascending: false })
+        // Optional — new contacts have no activities yet
+        supabase
+          .from('contact_activities')
+          .select('id, workspace_id, contact_id, type, details, created_at, created_by, activity_date')
+          .eq('contact_id', id)
+          .order('created_at', { ascending: false }),
 
-      // Fetch Referrer (who referred this contact)
-      const { data: referredBy } = await supabase
-        .from('referrals')
-        .select('*, referrer:referrer_id(name)')
-        .eq('candidate_contact_id', id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
+        // Optional — most contacts were not referred by someone
+        supabase
+          .from('referrals')
+          .select('*, referrer:referrer_id(name)')
+          .eq('candidate_contact_id', id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
 
-      // Fetch Referred Candidates (who this contact referred)
-      const { data: referredCandidates = [] } = await supabase
-        .from('referrals')
-        .select('*, candidate:candidate_contact_id(name)')
-        .eq('referrer_id', id)
-        .order('created_at', { ascending: false })
+        // Optional — most contacts have not referred anyone yet
+        supabase
+          .from('referrals')
+          .select('*, candidate:candidate_contact_id(name)')
+          .eq('referrer_id', id)
+          .order('created_at', { ascending: false }),
+      ])
+
+      const opportunity = opportunityResult.status === 'fulfilled'
+        ? (opportunityResult.value.data ?? undefined)
+        : undefined
+
+      const activities = activitiesResult.status === 'fulfilled'
+        ? (activitiesResult.value.data ?? [])
+        : []
+
+      const referredBy = referredByResult.status === 'fulfilled'
+        ? (referredByResult.value.data ?? undefined)
+        : undefined
+
+      const referredCandidates = referredCandidatesResult.status === 'fulfilled'
+        ? (referredCandidatesResult.value.data ?? [])
+        : []
 
       return {
         ...contact,
-        opportunity: opportunity || undefined,
-        activities: activities || [],
-        referredBy: referredBy || undefined,
-        referredCandidates: referredCandidates || []
+        opportunity,
+        activities,
+        referredBy,
+        referredCandidates,
       } as unknown as ContactProfileData
     },
     enabled: !!id,

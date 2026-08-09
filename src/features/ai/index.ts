@@ -1,0 +1,6 @@
+export { AssistantPanel } from './components/AssistantPanel'
+export { useAssistant } from '../../sdk/ai/hooks/useAssistant'
+export { GlobalAssistant } from './GlobalAssistant'
+export { CandidateSummaryPanel } from './components/CandidateSummaryPanel'
+export { OperationsCoachBriefing } from './components/OperationsCoachBriefing'
+export { MarketingAnalystBrief } from './components/MarketingAnalystBrief'

@@ -8,11 +8,6 @@ import { createIDBPersister } from './lib/offlineSync'
 import * as Sentry from '@sentry/react'
 import { ErrorBoundary } from './components/providers/ErrorBoundary'
 import { GlobalErrorBoundary } from './components/providers/GlobalErrorBoundary'
-import { initStressTester } from './lib/stress-test'
-
-if (import.meta.env.DEV) {
-  initStressTester()
-}
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN || "",

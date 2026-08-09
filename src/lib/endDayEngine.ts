@@ -14,6 +14,10 @@ export interface DailyReportData {
   rechargeDone: number
   trainingStarted: number
   activation: number
+  calls: number
+  interviewsScheduled: number
+  interviewsAttended: number
+  referralCommission: number
 }
 
 export async function generateDailyFieldReportData(userId: string, workspaceId: string): Promise<DailyReportData> {
@@ -32,7 +36,11 @@ export async function generateDailyFieldReportData(userId: string, workspaceId: 
     screeningDone: 0,
     rechargeDone: 0,
     trainingStarted: 0,
-    activation: 0
+    activation: 0,
+    calls: 0,
+    interviewsScheduled: 0,
+    interviewsAttended: 0,
+    referralCommission: 0
   }
 
   if (!navigator.onLine) {
@@ -47,8 +55,8 @@ export async function generateDailyFieldReportData(userId: string, workspaceId: 
       .select('*', { count: 'exact', head: true })
       .eq('workspace_id', workspaceId)
       .eq('created_by', userId)
-      .gte('created_at', startOfDay)
-      .lte('created_at', endOfDay)
+      .gte('entry_date', startOfDay)
+      .lte('entry_date', endOfDay)
 
     data.leadsCollected = leadsCount || 0
 
@@ -57,8 +65,8 @@ export async function generateDailyFieldReportData(userId: string, workspaceId: 
       .from('contact_activities')
       .select('activity_type')
       .eq('workspace_id', workspaceId)
-      .gte('created_at', startOfDay)
-      .lte('created_at', endOfDay)
+      .gte('activity_date', startOfDay)
+      .lte('activity_date', endOfDay)
 
     if (activities) {
       data.walkIn = activities.filter(a => a.activity_type === 'visited').length
@@ -66,30 +74,56 @@ export async function generateDailyFieldReportData(userId: string, workspaceId: 
       data.rechargeDone = activities.filter(a => a.activity_type === 'recharged').length
       data.trainingStarted = activities.filter(a => a.activity_type === 'training_started').length
       data.activation = activities.filter(a => a.activity_type === 'activated').length
+      data.calls = activities.filter(a => a.activity_type === 'called').length
+    }
+
+    // 2.5 Interviews
+    const { data: interviews } = await supabase
+      .from('interviews')
+      .select('status, created_at, interview_date')
+      .eq('workspace_id', workspaceId)
+      
+    if (interviews) {
+      data.interviewsScheduled = interviews.filter(i => new Date(i.created_at) >= new Date(startOfDay) && new Date(i.created_at) <= new Date(endOfDay)).length
+      data.interviewsAttended = interviews.filter(i => i.status === 'attended' && i.interview_date === dayjs().format('YYYY-MM-DD')).length
+    }
+
+    // 2.6 Referral Commission
+    const { data: referrals } = await supabase
+      .from('referrals')
+      .select('commission_amount')
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'paid')
+      .gte('paid_date', startOfDay)
+      .lte('paid_date', endOfDay)
+      
+    if (referrals) {
+      data.referralCommission = referrals.reduce((sum, r) => sum + (r.commission_amount || 0), 0)
     }
 
     // 3. Expected Walk-ins (Follow-ups in the future)
-    const { data: futureOpps } = await supabase
-      .from('opportunities')
-      .select('next_followup, contact_id, contacts(name)')
+    const { data: futureFollowUps } = await supabase
+      .from('follow_ups')
+      .select('follow_up_date, contact_id, contacts(name)')
       .eq('workspace_id', workspaceId)
-      .gte('next_followup', tomorrowStart)
+      .eq('status', 'pending')
+      .gte('follow_up_date', dayjs(tomorrowStart).format('YYYY-MM-DD'))
 
-    if (futureOpps && futureOpps.length > 0) {
-      data.expectedWalkIn = futureOpps.length
+    if (futureFollowUps && futureFollowUps.length > 0) {
+      data.expectedWalkIn = futureFollowUps.length
       
       const names: string[] = []
-      futureOpps.forEach((opp: any) => {
-        if (opp.contacts?.name) {
-          names.push(opp.contacts.name.split(' ')[0])
+      futureFollowUps.forEach((f: any) => {
+        if (f.contacts?.name) {
+          names.push(f.contacts.name.split(' ')[0])
         }
       })
       data.expectedWalkInNames = names
 
       // Find the closest future date for the string
-      const sorted = [...futureOpps].sort((a, b) => new Date(a.next_followup!).getTime() - new Date(b.next_followup!).getTime())
-      if (sorted[0]?.next_followup) {
-        data.expectedWalkInDateStr = dayjs(sorted[0].next_followup).format('DD MMM')
+      const sorted = [...futureFollowUps].sort((a, b) => new Date(a.follow_up_date!).getTime() - new Date(b.follow_up_date!).getTime())
+      if (sorted[0]?.follow_up_date) {
+        data.expectedWalkInDateStr = dayjs(sorted[0].follow_up_date).format('DD MMM')
       }
     }
 

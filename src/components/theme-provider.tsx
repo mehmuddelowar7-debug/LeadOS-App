@@ -22,13 +22,12 @@ const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
 
 export function ThemeProvider({
   children,
-  defaultTheme = "system",
+  defaultTheme = "dark",
   storageKey = "vite-ui-theme",
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
-  )
+  // Hardcoded to dark mode for RecruitOS
+  const [theme, setTheme] = useState<Theme>("dark")
 
   useEffect(() => {
     const root = window.document.documentElement

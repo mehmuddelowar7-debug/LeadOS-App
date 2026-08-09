@@ -1,0 +1,2 @@
+-- Archived file: v1.2_field_recruiter.sql
+-- Original content was permanently lost during un-tracked git deletion before restoration.

@@ -1,109 +1,43 @@
 import { ROUTES } from '@/lib/routes'
 import { useAppNavigate } from '@/lib/routes'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useParams } from 'react-router'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, Phone, MessageCircle, Edit, Calendar,
   FileText, GraduationCap, User,
-  MoreHorizontal, Share2, Award, Users
+  MoreHorizontal, Share2, Award, Users, MessageSquare
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { StatusBadge, ScoreBadge } from '@/components/shared/StatusBadge'
 import { cn } from '@/lib/utils'
 import { Separator } from '@/components/ui/separator'
-import type { ContactActivity } from '@/types'
 import { getProbabilityLabel } from '@/types'
 import { toast } from 'sonner'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
+import { supabase } from '@/lib/supabase'
 import { CallLogSheet } from './CallLogSheet'
 import { WhatsAppSheet } from './WhatsAppTemplates'
+import { AddInterviewSheet } from './AddInterviewSheet'
+import { AddFollowUpSheet } from './AddFollowUpSheet'
+import { ContactActionsSheet } from './ContactActionsSheet'
+import { ContactEditSheet } from './ContactEditSheet'
+import { CRMSummaryPanel } from './components/CRMSummaryPanel'
+import { getHealth, getPriorityLevel, getNextAction, type CandidateData } from '@/engine/intelligence'
+import { logActivity } from '@/lib/activityLogger'
+import { useDocumentUpload } from '@/hooks/useDocumentUpload'
 
 dayjs.extend(relativeTime)
 
 import { useContactProfile } from '@/hooks/useContactProfile'
 
-// ============================================================================
-// Activity Icon & Color
-// ============================================================================
-const ACTIVITY_CONFIG: Record<string, { icon: string; color: string; label: string }> = {
-  created: { icon: '✨', color: 'bg-blue-500/10 text-blue-500', label: 'Created' },
-  called: { icon: '📞', color: 'bg-emerald-500/10 text-emerald-500', label: 'Call' },
-  whatsapp_sent: { icon: '💬', color: 'bg-green-500/10 text-green-500', label: 'WhatsApp' },
-  visited: { icon: '🏠', color: 'bg-purple-500/10 text-purple-500', label: 'Visited' },
-  note_added: { icon: '📝', color: 'bg-amber-500/10 text-amber-500', label: 'Note' },
-  status_changed: { icon: '🔄', color: 'bg-violet-500/10 text-violet-500', label: 'Status Changed' },
-  registered: { icon: '📋', color: 'bg-indigo-500/10 text-indigo-500', label: 'Registered' },
-  recharged: { icon: '💳', color: 'bg-teal-500/10 text-teal-500', label: 'Recharged' },
-  training_started: { icon: '📚', color: 'bg-cyan-500/10 text-cyan-500', label: 'Training Started' },
-  training_completed: { icon: '🎓', color: 'bg-emerald-500/10 text-emerald-500', label: 'Training Done' },
-  activated: { icon: '🚀', color: 'bg-green-500/10 text-green-500', label: 'Activated' },
-  document_updated: { icon: '📄', color: 'bg-orange-500/10 text-orange-500', label: 'Document' },
-  follow_up_set: { icon: '📅', color: 'bg-violet-500/10 text-violet-500', label: 'Follow-up Set' },
-}
-
-// ============================================================================
-// Info Row
-// ============================================================================
-function InfoRow({ label, value, icon }: { label: string; value: string | null | undefined; icon?: React.ReactNode }) {
-  if (!value) return null
-  return (
-    <div className="flex items-center justify-between py-2.5">
-      <span className="text-xs text-muted-foreground flex items-center gap-2">
-        {icon}
-        {label}
-      </span>
-      <span className="text-sm font-medium text-foreground">{value}</span>
-    </div>
-  )
-}
-
-// ============================================================================
-// Timeline Component
-// ============================================================================
-function Timeline({ activities }: { activities: ContactActivity[] }) {
-  return (
-    <div className="relative">
-      <div className="absolute left-4 top-2 bottom-2 w-px bg-border" />
-      <div className="space-y-0">
-        {activities.map((activity, i) => {
-          const config = ACTIVITY_CONFIG[activity.activity_type] || ACTIVITY_CONFIG.note_added
-          return (
-            <motion.div
-              key={activity.id}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="relative flex gap-3 pb-4"
-            >
-              <div className={cn('relative z-10 h-8 w-8 rounded-full flex items-center justify-center text-sm shrink-0', config.color)}>
-                {config.icon}
-              </div>
-              <div className="flex-1 min-w-0 pt-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-foreground">{config.label}</span>
-                  <span className="text-[10px] text-muted-foreground shrink-0">
-                    {dayjs(activity.created_at).format('h:mm A')}
-                  </span>
-                </div>
-                {activity.content && (
-                  <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{activity.content}</p>
-                )}
-                {(i === 0 || dayjs(activity.created_at).format('MMM D') !== dayjs(activities[i - 1]?.created_at).format('MMM D')) && (
-                  <span className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest mt-1 block">
-                    {dayjs(activity.created_at).format('ddd, MMM D')}
-                  </span>
-                )}
-              </div>
-            </motion.div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
+import { InfoRow } from './components/InfoRow'
+import { ContactTimeline as Timeline } from './components/ContactTimeline'
+import { CandidatePipeline } from './components/CandidatePipeline'
+import { CandidateSummaryPanel } from '@/features/ai'
+import { useAIContextBuilder } from '@/sdk/ai'
 
 // ============================================================================
 // Contact Profile View
@@ -113,11 +47,18 @@ const TABS = ['Profile', 'History', 'Operations'] as const
 export function ContactProfileView() {
   const { id } = useParams()
   const navigate = useAppNavigate()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { uploadDocument, isUploading } = useDocumentUpload(id!)
   const [activeTab, setActiveTab] = useState<typeof TABS[number]>('Profile')
   const [callSheetOpen, setCallSheetOpen] = useState(false)
   const [whatsappSheetOpen, setWhatsappSheetOpen] = useState(false)
+  const [interviewSheetOpen, setInterviewSheetOpen] = useState(false)
+  const [followUpSheetOpen, setFollowUpSheetOpen] = useState(false)
+  const [actionsSheetOpen, setActionsSheetOpen] = useState(false)
+  const [editSheetOpen, setEditSheetOpen] = useState(false)
 
   const { data: profile, isLoading } = useContactProfile(id)
+  const aiSnapshot = useAIContextBuilder('default', true)
 
   const handleCall = () => {
     if (!profile) return
@@ -125,10 +66,31 @@ export function ContactProfileView() {
     setTimeout(() => setCallSheetOpen(true), 1500)
   }
 
-  const handleDelete = () => {
-    if (window.confirm('Are you sure you want to delete this contact? This cannot be undone.')) {
-      toast.success('Contact deleted successfully')
-      navigate(ROUTES.CONTACTS)
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !profile) return
+    const url = await uploadDocument(file, 'document')
+    if (url) {
+      logActivity(profile.id, 'note', `Uploaded a document: ${file.name}`)
+    }
+  }
+
+  const handleArchive = async () => {
+    if (window.confirm('Are you sure you want to archive this contact?')) {
+      try {
+        const { error } = await supabase
+          .from('contacts')
+          .update({ is_archived: true, updated_at: new Date().toISOString() })
+          .eq('id', profile!.id)
+
+        if (error) throw error
+        
+        await logActivity(profile!.id, 'note', 'Contact was archived')
+        toast.success('Contact archived successfully')
+        navigate(ROUTES.CONTACTS)
+      } catch (err: any) {
+        toast.error('Failed to archive: ' + err.message)
+      }
     }
   }
 
@@ -146,7 +108,7 @@ export function ContactProfileView() {
       <div className="flex flex-col h-full items-center justify-center p-6 text-center">
         <h3 className="text-lg font-bold text-foreground mb-2">Contact not found</h3>
         <p className="text-sm text-muted-foreground mb-4">This contact may have been deleted.</p>
-        <Button onClick={() => navigate(ROUTES.CONTACTS)}>Return to Network</Button>
+        <Button onClick={() => navigate(ROUTES.CONTACTS)}>Return to Candidates</Button>
       </div>
     )
   }
@@ -161,6 +123,28 @@ export function ContactProfileView() {
 
   const initials = contact.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
   const probability = opportunity ? getProbabilityLabel(opportunity.score) : 'Low'
+
+  const candidateData: CandidateData = {
+    id: contact.id,
+    name: contact.name,
+    stage: opportunity?.status || 'lead',
+    status: opportunity?.status || 'lead',
+    lastContactedAt: contact.updated_at,
+    lastActivityAt: contact.updated_at,
+    stageUpdatedAt: opportunity?.updated_at || contact.updated_at,
+    nextFollowUp: opportunity?.next_followup || null,
+    interviewDate: opportunity?.next_followup || null,
+    interviewStatus: null,
+    rechargeAmount: (opportunity as any)?.recharge_amount || 0,
+    rechargeStatus: (opportunity as any)?.recharge_status || null,
+  }
+  const today = dayjs()
+  const health = getHealth(candidateData, today)
+  const priority = getPriorityLevel(candidateData, today)
+  const nextAction = getNextAction(candidateData, today)
+
+  const healthColor = health === 'Healthy' ? 'bg-emerald-500/10 text-emerald-500' : health === 'Warning' ? 'bg-yellow-500/10 text-yellow-500' : health === 'Critical' ? 'bg-red-500/10 text-red-500' : 'bg-blue-500/10 text-blue-500'
+  const priorityColor = priority === 'P0' ? 'bg-red-500/10 text-red-500' : priority === 'P1' ? 'bg-orange-500/10 text-orange-500' : priority === 'P2' ? 'bg-blue-500/10 text-blue-500' : 'bg-zinc-500/10 text-zinc-500'
 
   return (
     <div className="flex flex-col h-full relative px-4 md:px-6 lg:px-8">
@@ -177,7 +161,10 @@ export function ContactProfileView() {
               <button className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors">
                 <Share2 className="h-4 w-4" />
               </button>
-              <button className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors">
+              <button 
+                onClick={() => setActionsSheetOpen(true)}
+                className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-colors"
+              >
                 <MoreHorizontal className="h-4 w-4" />
               </button>
             </div>
@@ -205,13 +192,23 @@ export function ContactProfileView() {
               </div>
               
               {opportunity && (
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <StatusBadge status={opportunity.status} />
                   <ScoreBadge score={opportunity.score} />
+                  <div className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] uppercase font-semibold transition-colors border-transparent", healthColor)}>
+                     {health}
+                  </div>
+                  <div className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] uppercase font-semibold transition-colors border-transparent", priorityColor)}>
+                     {priority}
+                  </div>
                 </div>
               )}
               
-              <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
+              <div className="mt-2 text-xs font-bold text-primary flex items-center gap-1.5 bg-primary/5 w-fit px-2 py-1 rounded border border-primary/10">
+                Next Action: {nextAction}
+              </div>
+
+              <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground">
                 {contact.origin && <span>{contact.origin}</span>}
                 {contact.origin && contact.current_area && <span>·</span>}
                 {contact.current_area && <span>{contact.current_area}</span>}
@@ -237,6 +234,15 @@ export function ContactProfileView() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Candidate Pipeline */}
+          {opportunity && (
+            <CandidatePipeline 
+              contactId={contact.id} 
+              opportunity={opportunity} 
+              onOpenInterview={() => setInterviewSheetOpen(true)}
+            />
           )}
 
           {opportunity?.next_followup && (
@@ -282,17 +288,25 @@ export function ContactProfileView() {
           </div>
         </div>
 
-        <div className="pb-4">
+        <div className="pb-32">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.15 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
             >
               {activeTab === 'Profile' && (
                 <div className="space-y-4">
+                  {/* Local CRM Summary (Deterministic fallback) */}
+                  <CRMSummaryPanel contact={contact as any} />
+                  
+                  {/* AI Candidate Summary */}
+                  {contact && aiSnapshot && (
+                    <CandidateSummaryPanel snapshot={aiSnapshot} candidateId={contact.id} />
+                  )}
+
                   <div className="glass-card rounded-2xl p-4">
                     <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Personal</h3>
                     <InfoRow label="Phone" value={contact.phone} icon={<Phone className="h-3 w-3" />} />
@@ -304,16 +318,72 @@ export function ContactProfileView() {
                     <InfoRow label="Gender" value={contact.gender} />
                     <Separator className="opacity-50" />
                     <InfoRow label="Origin" value={contact.origin} />
+                    <div className="glass-card rounded-2xl p-4">
+                      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Location</h3>
+                      <InfoRow label="Area" value={contact.current_area} />
+                      <Separator className="opacity-50" />
+                      <InfoRow label="City" value={contact.custom_fields?.city as string} />
+                      <Separator className="opacity-50" />
+                      <InfoRow label="State" value={contact.custom_fields?.state as string} />
+                      <Separator className="opacity-50" />
+                      <InfoRow label="Address" value={contact.custom_fields?.address as string} />
+                    </div>
                   </div>
 
                   {opportunity && (
-                    <div className="glass-card rounded-2xl p-4">
-                      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Skills & Experience</h3>
+                    <div className="space-y-4">
+                      <div className="glass-card rounded-2xl p-4">
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Skills & Experience</h3>
                       <InfoRow label="Education" value={opportunity.education?.replace('_', ' ')} icon={<GraduationCap className="h-3 w-3" />} />
                       <Separator className="opacity-50" />
                       <InfoRow label="English Level" value={opportunity.english_level} />
                       <Separator className="opacity-50" />
                       <InfoRow label="Experience" value={opportunity.experience === 'fresher' ? 'Fresher' : `${opportunity.experience} years`} />
+                      </div>
+
+                      <div className="glass-card rounded-2xl p-4">
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Financials</h3>
+                        <InfoRow label="Current Salary" value={(opportunity as any).current_salary ? `₹${(opportunity as any).current_salary}` : null} />
+                        <Separator className="opacity-50" />
+                        <InfoRow label="Expected Salary" value={(opportunity as any).expected_salary ? `₹${(opportunity as any).expected_salary}` : null} />
+                        <Separator className="opacity-50" />
+                        <InfoRow label="Expected Benefits" value={(opportunity as any).expected_benefits || null} />
+                      </div>
+                      
+                      <div className="glass-card rounded-2xl p-4">
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center justify-between">
+                          Documents
+                          <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            className="hidden" 
+                            onChange={handleDocumentUpload} 
+                          />
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 text-[10px] px-2 text-primary"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isUploading}
+                          >
+                            {isUploading ? 'Uploading...' : 'Upload'}
+                          </Button>
+                        </h3>
+                        <div className="flex flex-col gap-2 mt-3">
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border/50">
+                            <span className="text-sm font-medium text-muted-foreground">Resume</span>
+                            <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded uppercase">Pending</span>
+                          </div>
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border/50">
+                            <span className="text-sm font-medium text-muted-foreground">Aadhaar Card</span>
+                            <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded uppercase">Pending</span>
+                          </div>
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border/50">
+                            <span className="text-sm font-medium text-muted-foreground">PAN Card</span>
+                            <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded uppercase">Pending</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                   
@@ -451,9 +521,23 @@ export function ContactProfileView() {
                     </div>
                   </div>
 
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Actions</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button onClick={() => setInterviewSheetOpen(true)} variant="outline" className="h-12 rounded-xl font-semibold">
+                        <Calendar className="h-4 w-4 mr-2 text-primary" />
+                        Interview
+                      </Button>
+                      <Button onClick={() => setFollowUpSheetOpen(true)} variant="outline" className="h-12 rounded-xl font-semibold">
+                        <Calendar className="h-4 w-4 mr-2 text-primary" />
+                        Follow-up
+                      </Button>
+                    </div>
+                  </div>
+
                   <div className="pt-6">
-                    <Button variant="destructive" className="w-full rounded-xl font-bold bg-destructive/10 text-destructive hover:bg-destructive/20 border-transparent shadow-none" onClick={handleDelete}>
-                      Delete Contact
+                    <Button variant="destructive" className="w-full rounded-xl font-bold bg-destructive/10 text-destructive hover:bg-destructive/20 border-transparent shadow-none" onClick={handleArchive}>
+                      Archive Contact
                     </Button>
                   </div>
                 </div>
@@ -472,24 +556,38 @@ export function ContactProfileView() {
           <Phone className="h-5 w-5 mr-1.5" /> Call
         </Button>
         <Button
-          className="flex-1 min-h-[52px] rounded-[16px] bg-[#25D366] hover:bg-[#128C7E] text-white font-bold shadow-sm"
+          className="flex-1 min-h-[52px] rounded-[16px] bg-emerald-500 hover:bg-emerald-600 text-white font-bold shadow-sm"
           onClick={() => setWhatsappSheetOpen(true)}
         >
           <MessageCircle className="h-5 w-5 mr-1.5" /> WhatsApp
         </Button>
+        <a
+          href={`sms:${contact.phone}`}
+          className="flex-1 min-h-[52px] rounded-[16px] bg-blue-500 hover:bg-blue-600 text-white font-bold shadow-sm inline-flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          onClick={() => logActivity(contact.id, 'sms', 'Sent SMS via action bar')}
+        >
+          <MessageSquare className="h-5 w-5 mr-1.5" /> SMS
+        </a>
         <Button
           variant="outline"
           className="w-[52px] min-h-[52px] rounded-[16px] p-0 shrink-0 bg-background shadow-sm"
-          onClick={() => alert('Follow-up sheet logic')}
+          onClick={() => setFollowUpSheetOpen(true)}
         >
           <Calendar className="h-5 w-5 text-violet-500" />
         </Button>
         <Button
           variant="outline"
           className="w-[52px] min-h-[52px] rounded-[16px] p-0 shrink-0 bg-background shadow-sm"
-          onClick={() => navigate(`/contacts/${id}/edit`)}
+          onClick={() => setEditSheetOpen(true)}
         >
           <Edit className="h-5 w-5" />
+        </Button>
+        <Button
+          variant="outline"
+          className="w-[52px] min-h-[52px] rounded-[16px] p-0 shrink-0 bg-background shadow-sm"
+          onClick={() => setActionsSheetOpen(true)}
+        >
+          <MoreHorizontal className="h-5 w-5" />
         </Button>
       </div>
 
@@ -503,7 +601,33 @@ export function ContactProfileView() {
       <WhatsAppSheet
         open={whatsappSheetOpen}
         onClose={() => setWhatsappSheetOpen(false)}
-        lead={contact as any} // Keeping as any for now to avoid refactoring the entire WhatsApp sheet right now
+        lead={contact as any}
+      />
+
+      <AddInterviewSheet
+        open={interviewSheetOpen}
+        onClose={() => setInterviewSheetOpen(false)}
+        contactId={contact.id}
+      />
+      
+      <AddFollowUpSheet
+        open={followUpSheetOpen}
+        onClose={() => setFollowUpSheetOpen(false)}
+        contactId={contact.id}
+      />
+
+      <ContactActionsSheet 
+        open={actionsSheetOpen} 
+        onOpenChange={setActionsSheetOpen} 
+        contactId={contact.id} 
+        isDeleted={(contact as any).is_deleted}
+        onEdit={() => setEditSheetOpen(true)}
+      />
+      
+      <ContactEditSheet 
+        open={editSheetOpen}
+        onOpenChange={setEditSheetOpen}
+        contact={contact}
       />
     </div>
   )

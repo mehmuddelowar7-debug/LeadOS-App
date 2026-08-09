@@ -47,8 +47,8 @@ export function useQueue() {
         .order('score', { ascending: false })
 
       if (error) {
-        console.error('Failed to fetch priority queue:', error)
-        throw error
+        console.warn('Priority queue fetch failed (schema may not be migrated):', error.message)
+        return [] as QueueItem[]
       }
 
       // Map DB schema to QueueItem

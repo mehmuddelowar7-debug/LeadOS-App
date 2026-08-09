@@ -1,20 +1,20 @@
 import { NavLink } from "react-router"
 import { cn } from "@/lib/utils"
 import { NAV_ITEMS } from "./navItems"
-import { Search, Plus, Sun, Moon } from "lucide-react"
+import { Search, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { useTheme } from "@/components/theme-provider"
+
 
 export function Sidebar() {
-  const { theme, setTheme } = useTheme()
+  // Theme is locked to dark
   return (
     <nav className="fixed left-0 top-0 bottom-0 z-50 w-64 hidden lg:flex flex-col py-6 px-4 glass border-r border-border/50">
       {/* Brand Header */}
       <div className="flex items-center gap-3 mb-8 px-2">
         <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center font-bold text-primary-foreground shadow-sm">
-          L
+          R
         </div>
-        <h1 className="text-xl font-bold tracking-tight text-foreground">LeadOS</h1>
+        <h1 className="text-xl font-bold tracking-tight text-foreground">RecruitOS</h1>
       </div>
 
       {/* Global Actions */}
@@ -28,7 +28,7 @@ export function Sidebar() {
         </Button>
         <Button className="w-full justify-start font-bold">
           <Plus className="mr-2 h-4 w-4" />
-          New Contact
+          Add Candidate
         </Button>
       </div>
 
@@ -57,21 +57,6 @@ export function Sidebar() {
             </NavLink>
           )
         })}
-      </div>
-
-      {/* Theme Toggle */}
-      <div className="mt-auto pt-4 border-t border-border/50">
-        <Button 
-          variant="ghost" 
-          className="w-full justify-start text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-        >
-          {theme === 'dark' ? (
-            <><Sun className="mr-3 h-5 w-5" /> Light Mode</>
-          ) : (
-            <><Moon className="mr-3 h-5 w-5" /> Dark Mode</>
-          )}
-        </Button>
       </div>
     </nav>
   )

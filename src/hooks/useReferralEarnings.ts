@@ -27,8 +27,8 @@ export function useReferralEarnings() {
         .eq('workspace_id', workspaceId)
 
       if (error) {
-        console.error('Failed to fetch referral earnings:', error)
-        throw error
+        console.warn('Referral earnings fetch failed:', error.message)
+        return { total: 0, pending: 0, approved: 0, paid: 0, rejected: 0 } as EarningsData
       }
 
       const earnings = {

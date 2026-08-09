@@ -8,11 +8,11 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import dayjs from 'dayjs'
 import { useContacts } from '@/hooks/useContacts'
-import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/features/auth/AuthStore'
 import { REFERRAL_STATUSES } from '@/types'
 import type { Referral } from '@/types'
 import { pushToMutationQueue } from '@/lib/offlineSync'
+import { insertReferral, updateReferral } from './queries'
 
 interface AddReferralSheetProps {
   open: boolean
@@ -31,6 +31,12 @@ export function AddReferralSheet({ open, onClose, existingReferral }: AddReferra
   const [paidDate, setPaidDate] = useState<string>(existingReferral?.paid_date || dayjs().format('YYYY-MM-DD'))
   const [referralDate, setReferralDate] = useState<string>(existingReferral?.referral_date || dayjs().format('YYYY-MM-DD'))
   const [remarks, setRemarks] = useState<string>(existingReferral?.remarks || '')
+  
+  // V1.1 Audit Fields
+  const [paymentMethod, setPaymentMethod] = useState<string>(existingReferral?.payment_method || 'upi')
+  const [commissionReason, setCommissionReason] = useState<string>(existingReferral?.commission_reason || '')
+
+  const isAlreadyPaid = existingReferral?.status === 'paid'
 
   const [referrerSearchOpen, setReferrerSearchOpen] = useState(false)
   const [candidateSearchOpen, setCandidateSearchOpen] = useState(false)
@@ -45,6 +51,8 @@ export function AddReferralSheet({ open, onClose, existingReferral }: AddReferra
       setPaidDate(existingReferral?.paid_date || dayjs().format('YYYY-MM-DD'))
       setReferralDate(existingReferral?.referral_date || dayjs().format('YYYY-MM-DD'))
       setRemarks(existingReferral?.remarks || '')
+      setPaymentMethod(existingReferral?.payment_method || 'upi')
+      setCommissionReason(existingReferral?.commission_reason || '')
     }
   }, [open, existingReferral])
 
@@ -54,7 +62,7 @@ export function AddReferralSheet({ open, onClose, existingReferral }: AddReferra
       return
     }
 
-    const payload = {
+    const payload: any = {
       workspace_id: user?.user_metadata?.workspace_id || '00000000-0000-0000-0000-000000000000',
       referrer_id: referrerId,
       candidate_contact_id: candidateId,
@@ -63,7 +71,14 @@ export function AddReferralSheet({ open, onClose, existingReferral }: AddReferra
       commission_amount: Number(commission),
       paid_date: status === 'paid' ? paidDate : null,
       referral_date: referralDate,
-      remarks: remarks
+      remarks: remarks,
+      payment_method: status === 'paid' ? paymentMethod : null,
+      commission_reason: commissionReason
+    }
+
+    if (status === 'approved' && existingReferral?.status !== 'approved' && existingReferral?.status !== 'paid') {
+      payload.approved_by = user?.id
+      payload.approved_date = dayjs().format('YYYY-MM-DD')
     }
 
     try {
@@ -71,8 +86,7 @@ export function AddReferralSheet({ open, onClose, existingReferral }: AddReferra
         if (!navigator.onLine) {
           await pushToMutationQueue({ table: 'referrals', action: 'UPDATE', payload, matchField: 'id', matchValue: existingReferral.id })
         } else {
-          const { error } = await supabase.from('referrals').update(payload).eq('id', existingReferral.id)
-          if (error) throw error
+          await updateReferral(existingReferral.id, payload)
         }
         toast.success('Referral updated')
       } else {
@@ -83,8 +97,7 @@ export function AddReferralSheet({ open, onClose, existingReferral }: AddReferra
         if (!navigator.onLine) {
           await pushToMutationQueue({ table: 'referrals', action: 'INSERT', payload: insertPayload })
         } else {
-          const { error } = await supabase.from('referrals').insert(insertPayload)
-          if (error) throw error
+          await insertReferral(insertPayload)
         }
         toast.success('Referral added')
       }
@@ -166,8 +179,9 @@ export function AddReferralSheet({ open, onClose, existingReferral }: AddReferra
                     <Input
                       type="number"
                       value={commission}
+                      disabled={isAlreadyPaid}
                       onChange={e => setCommission(e.target.value)}
-                      className="pl-11 h-14 text-lg rounded-2xl bg-muted/50 border-transparent focus:bg-background"
+                      className="pl-11 h-14 text-lg rounded-2xl bg-muted/50 border-transparent focus:bg-background disabled:opacity-70"
                     />
                   </div>
                 </div>
@@ -189,39 +203,74 @@ export function AddReferralSheet({ open, onClose, existingReferral }: AddReferra
               <div>
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Status</Label>
                 <div className="flex gap-2">
-                  {REFERRAL_STATUSES.map(s => (
-                    <button
-                      key={s}
-                      onClick={() => setStatus(s)}
-                      className={cn(
-                        "flex-1 h-12 rounded-xl text-xs font-bold capitalize transition-colors border",
-                        status === s 
-                          ? s === 'approved' ? 'bg-blue-500/10 text-blue-600 border-blue-500/30'
-                          : s === 'paid' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
-                          : s === 'rejected' ? 'bg-red-500/10 text-red-600 border-red-500/30'
-                          : 'bg-amber-500/10 text-amber-600 border-amber-500/30'
-                          : 'bg-muted/50 text-muted-foreground border-transparent hover:bg-accent'
-                      )}
-                    >
-                      {s}
-                    </button>
-                  ))}
+                  {REFERRAL_STATUSES.map(s => {
+                    // Strict Validation: Cannot move backwards from Paid
+                    const isDisabled = isAlreadyPaid && s !== 'paid'
+
+                    return (
+                      <button
+                        key={s}
+                        disabled={isDisabled}
+                        onClick={() => setStatus(s)}
+                        className={cn(
+                          "flex-1 h-12 rounded-xl text-xs font-bold capitalize transition-colors border",
+                          isDisabled && "opacity-40 cursor-not-allowed",
+                          status === s 
+                            ? s === 'approved' ? 'bg-blue-500/10 text-blue-600 border-blue-500/30'
+                            : s === 'paid' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
+                            : s === 'rejected' ? 'bg-red-500/10 text-red-600 border-red-500/30'
+                            : 'bg-amber-500/10 text-amber-600 border-amber-500/30'
+                            : 'bg-muted/50 text-muted-foreground border-transparent hover:bg-accent'
+                        )}
+                      >
+                        {s}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 
               {status === 'paid' && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
-                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Paid Date</Label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input
-                      type="date"
-                      value={paidDate}
-                      onChange={e => setPaidDate(e.target.value)}
-                      className="pl-10 h-14 rounded-2xl bg-muted/50 border-transparent focus:bg-background"
-                    />
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Paid Date</Label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                        <Input
+                          type="date"
+                          value={paidDate}
+                          onChange={e => setPaidDate(e.target.value)}
+                          className="pl-10 h-14 rounded-2xl bg-muted/50 border-transparent focus:bg-background"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Method</Label>
+                      <select
+                        value={paymentMethod}
+                        onChange={e => setPaymentMethod(e.target.value)}
+                        className="w-full h-14 rounded-2xl bg-muted/50 border-transparent focus:bg-background px-4 font-medium"
+                      >
+                        <option value="upi">UPI</option>
+                        <option value="bank_transfer">Bank Transfer</option>
+                        <option value="cash">Cash</option>
+                      </select>
+                    </div>
                   </div>
                 </motion.div>
+              )}
+
+              {status === 'approved' && (
+                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Commission Reason (Optional)</Label>
+                    <Input
+                      value={commissionReason}
+                      onChange={e => setCommissionReason(e.target.value)}
+                      placeholder="E.g. Placed as beautician"
+                      className="h-14 rounded-2xl bg-muted/50 border-transparent focus:bg-background"
+                    />
+                 </motion.div>
               )}
 
               <div>

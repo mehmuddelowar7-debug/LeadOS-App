@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/features/auth/AuthStore'
 import { Input } from '@/components/ui/input'
+import { analytics } from '@/lib/analytics'
 
 interface GlobalSearchProps {
   open: boolean
@@ -19,7 +20,10 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
   const user = useAuthStore(state => state.user)
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(query), 300)
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query)
+      if (query.length >= 2) analytics.trackSearch(query)
+    }, 300)
     return () => clearTimeout(timer)
   }, [query])
 
@@ -30,12 +34,12 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
 
       const workspaceId = user.user_metadata?.workspace_id || '00000000-0000-0000-0000-000000000000'
 
-      // Search contacts by name or phone
+      // Search contacts by name, phone, whatsapp, area, city, or state
       const { data, error } = await supabase
         .from('contacts')
-        .select('id, name, phone, roles')
+        .select('id, name, phone, whatsapp, roles, current_area')
         .eq('workspace_id', workspaceId)
-        .or(`name.ilike.%${debouncedQuery}%,phone.ilike.%${debouncedQuery}%`)
+        .or(`name.ilike.%${debouncedQuery}%,phone.ilike.%${debouncedQuery}%,whatsapp.ilike.%${debouncedQuery}%,current_area.ilike.%${debouncedQuery}%,custom_fields->>city.ilike.%${debouncedQuery}%,custom_fields->>state.ilike.%${debouncedQuery}%`)
         .limit(10)
 
       if (error) {
@@ -44,7 +48,8 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
       }
       return data || []
     },
-    enabled: open && debouncedQuery.length >= 2 && !!user
+    enabled: open && debouncedQuery.length >= 2 && !!user,
+    staleTime: 1000 * 60 * 5 // 5 minutes cache for super fast search
   })
 
   // Keyboard shortcut listener handled in useKeyboardShortcuts, 
@@ -68,7 +73,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
           initial={{ opacity: 0, scale: 0.95, y: -20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: -20 }}
-          transition={{ duration: 0.15 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
           className="w-full max-w-lg bg-card border border-border shadow-2xl rounded-2xl overflow-hidden flex flex-col"
         >
           {/* Search Header */}
@@ -77,7 +82,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search contacts by name or phone..."
+              placeholder="Search contacts by name, phone, or WhatsApp..."
               className="pl-10 border-0 bg-transparent h-12 focus-visible:ring-0 focus-visible:ring-offset-0 text-base"
               autoFocus
             />
@@ -118,6 +123,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
                   <button
                     key={contact.id}
                     onClick={() => {
+                      analytics.trackEvent('search', 'select_contact')
                       onClose()
                       navigate(`/contacts/${contact.id}`)
                     }}
@@ -127,7 +133,14 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
                       <User className="h-5 w-5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-foreground truncate">{contact.name}</div>
+                      <div className="font-semibold text-foreground truncate flex items-center gap-2">
+                        {contact.name}
+                        {contact.roles && contact.roles.length > 0 && (
+                          <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] uppercase tracking-wider font-bold">
+                            {contact.roles[0].replace('_', ' ')}
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                         <Phone className="h-3 w-3" /> {contact.phone}
                       </div>

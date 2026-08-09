@@ -47,7 +47,7 @@ export function useKeyboardShortcuts() {
           break
         case 'i':
           e.preventDefault()
-          navigate(ROUTES.INSIGHTS)
+          navigate(ROUTES.ANALYTICS)
           break
       }
     }

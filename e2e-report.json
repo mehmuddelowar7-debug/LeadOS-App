@@ -1,0 +1,37 @@
+[
+  {
+    "item": "Authentication",
+    "status": "PASS",
+    "detail": "Created user 8ca80034-c870-4b30-a418-2a91549d0007"
+  },
+  {
+    "item": "Workspace Creation",
+    "status": "PASS",
+    "detail": "Assigned workspace 6003998f-4879-4d22-bfed-5d0ab4bf3732"
+  },
+  {
+    "item": "Candidate CRUD - Create",
+    "status": "PASS",
+    "detail": "Inserted contact successfully"
+  },
+  {
+    "item": "Duplicate Prevention",
+    "status": "PASS",
+    "detail": "Unique constraint successfully blocked duplicate phone"
+  },
+  {
+    "item": "Candidate CRUD - Edit",
+    "status": "PASS",
+    "detail": "Updated contact successfully"
+  },
+  {
+    "item": "Timeline",
+    "status": "PASS",
+    "detail": "Inserted activity successfully"
+  },
+  {
+    "item": "Archive Operations",
+    "status": "PASS",
+    "detail": "Contact archived successfully"
+  }
+]

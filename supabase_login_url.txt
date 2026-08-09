@@ -1,0 +1,1 @@
+{"_tag":"Error","error":{"code":"LegacyLoginMissingTokenError","message":"Cannot use automatic login flow inside non-TTY environments. Please provide --token flag or set the SUPABASE_ACCESS_TOKEN environment variable."}}

@@ -10,6 +10,55 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- =============================================================================
+-- INTERVIEWS
+-- =============================================================================
+
+CREATE TABLE interviews (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  contact_id UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  created_by UUID NOT NULL REFERENCES auth.users(id),
+  
+  interview_date DATE NOT NULL,
+  interview_time TIME NOT NULL,
+  location TEXT,
+  branch TEXT,
+  status TEXT DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'attended', 'no_show', 'rescheduled', 'cancelled')),
+  notes TEXT,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_interviews_workspace ON interviews(workspace_id);
+CREATE INDEX idx_interviews_contact ON interviews(contact_id);
+CREATE INDEX idx_interviews_date ON interviews(interview_date);
+
+-- =============================================================================
+-- FOLLOW-UPS
+-- =============================================================================
+
+CREATE TABLE follow_ups (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  contact_id UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  created_by UUID NOT NULL REFERENCES auth.users(id),
+  
+  follow_up_date DATE NOT NULL,
+  follow_up_time TIME,
+  reminder TEXT,
+  priority lead_priority DEFAULT 'medium',
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'missed')),
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_follow_ups_workspace ON follow_ups(workspace_id);
+CREATE INDEX idx_follow_ups_contact ON follow_ups(contact_id);
+CREATE INDEX idx_follow_ups_date ON follow_ups(follow_up_date);
+
+-- =============================================================================
 -- ENUMS
 -- =============================================================================
 
@@ -46,7 +95,13 @@ CREATE TABLE workspace_members (
   workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member')),
-  daily_target INT DEFAULT 10,
+  target_leads INT DEFAULT 10,
+  target_calls INT DEFAULT 20,
+  target_interviews INT DEFAULT 5,
+  target_walkins INT DEFAULT 5,
+  target_recharges INT DEFAULT 2,
+  target_trainings INT DEFAULT 2,
+  target_activations INT DEFAULT 1,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (workspace_id, user_id)
 );
@@ -66,10 +121,12 @@ CREATE TYPE activity_type AS ENUM (
   'created', 'called', 'whatsapp_sent', 'visited', 'note_added',
   'status_changed', 'registered', 'recharged', 'training_started',
   'training_completed', 'activated', 'document_updated', 'follow_up_set',
-  'referral_received', 'reward_paid'
+  'referral_received', 'reward_paid',
+  'interview_scheduled', 'interview_attended', 'interview_no_show', 
+  'interview_rescheduled', 'interview_cancelled'
 );
 CREATE TYPE contact_source AS ENUM (
-  'walk_in', 'referral', 'instagram', 'facebook', 'whatsapp', 'friend', 'other'
+  'walk_in', 'referral', 'instagram', 'facebook', 'whatsapp', 'friend', 'meta_lead', 'google', 'other'
 );
 CREATE TYPE gamification_level AS ENUM ('bronze', 'silver', 'gold', 'diamond');
 
@@ -253,6 +310,17 @@ CREATE TABLE referrals (
   payment_reference TEXT,
   notes TEXT,
   
+  -- V1.1 Fields
+  candidate_contact_id UUID REFERENCES contacts(id),
+  commission_amount DECIMAL(10, 2) DEFAULT 0,
+  paid_date DATE,
+  remarks TEXT,
+  referral_date DATE DEFAULT CURRENT_DATE,
+  approved_by UUID REFERENCES auth.users(id),
+  approved_date DATE,
+  payment_method TEXT,
+  commission_reason TEXT,
+  
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (opportunity_id) -- A opportunity can only be referred once
@@ -397,6 +465,43 @@ CREATE TRIGGER workspaces_updated_at BEFORE UPDATE ON workspaces FOR EACH ROW EX
 CREATE TRIGGER opportunity_types_updated_at BEFORE UPDATE ON opportunity_types FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER user_profiles_updated_at BEFORE UPDATE ON user_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER contact_documents_updated_at BEFORE UPDATE ON contact_documents FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- Auto-create workspace + membership on new user signup
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  new_workspace_id UUID;
+BEGIN
+  INSERT INTO public.workspaces (id, name, created_at, updated_at)
+  VALUES (
+    gen_random_uuid(),
+    COALESCE(NEW.raw_user_meta_data->>'org_name', split_part(NEW.email, '@', 1) || '''s Workspace'),
+    now(),
+    now()
+  )
+  RETURNING id INTO new_workspace_id;
+
+  INSERT INTO public.workspace_members (workspace_id, user_id, role, created_at)
+  VALUES (new_workspace_id, NEW.id, 'owner', now());
+
+  UPDATE auth.users
+  SET raw_user_meta_data = raw_user_meta_data || jsonb_build_object('workspace_id', new_workspace_id)
+  WHERE id = NEW.id;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
+
 
 -- Candidate score calculation (Decision #8, updated for Recruitment Intelligence)
 CREATE OR REPLACE FUNCTION calculate_opportunity_score(opportunity_row opportunities)
@@ -553,38 +658,107 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
+  -- Actuals
+  v_leads_today INT;
+  v_calls_today INT;
+  v_interviews_scheduled_today INT;
+  v_interviews_attended_today INT;
   v_walkins_today INT;
+  v_recharges_today INT;
+  v_trainings_today INT;
+  v_activations_today INT;
   v_followups_pending INT;
-  v_target_remaining INT;
+  v_followups_today INT;
+  
+  -- Targets
+  t_leads INT;
+  t_calls INT;
+  t_interviews INT;
+  t_walkins INT;
+  t_recharges INT;
+  t_trainings INT;
+  t_activations INT;
+
+  -- Other
   v_total_contacts INT;
   v_active_contacts INT;
   v_pending_referrals INT;
   v_paid_referrals INT;
-  v_daily_target INT;
 BEGIN
-  -- 1. Mission Metrics
-  SELECT COUNT(*) INTO v_walkins_today FROM contacts 
-  WHERE workspace_id = p_workspace_id AND created_by = p_user_id AND date_trunc('day', created_at) = date_trunc('day', NOW());
+  -- 1. Fetch Targets
+  SELECT 
+    target_leads, target_calls, target_interviews, target_walkins, target_recharges, target_trainings, target_activations
+  INTO 
+    t_leads, t_calls, t_interviews, t_walkins, t_recharges, t_trainings, t_activations
+  FROM workspace_members 
+  WHERE workspace_id = p_workspace_id AND user_id = p_user_id;
 
-  SELECT COUNT(*) INTO v_followups_pending FROM opportunities 
-  WHERE workspace_id = p_workspace_id AND contact_id IN (SELECT id FROM contacts WHERE created_by = p_user_id) AND next_followup <= NOW();
+  -- Default targets if null
+  t_leads := COALESCE(t_leads, 10);
+  t_calls := COALESCE(t_calls, 20);
+  t_interviews := COALESCE(t_interviews, 5);
+  t_walkins := COALESCE(t_walkins, 5);
+  t_recharges := COALESCE(t_recharges, 2);
+  t_trainings := COALESCE(t_trainings, 2);
+  t_activations := COALESCE(t_activations, 1);
 
-  SELECT daily_target INTO v_daily_target FROM workspace_members WHERE workspace_id = p_workspace_id AND user_id = p_user_id;
-  v_target_remaining := GREATEST(0, COALESCE(v_daily_target, 10) - v_walkins_today);
+  -- 2. Fetch Actuals (Today)
+  SELECT COUNT(*) INTO v_leads_today FROM contacts 
+  WHERE workspace_id = p_workspace_id AND created_by = p_user_id AND created_at::date = CURRENT_DATE;
 
-  -- 2. Contact Metrics
-  SELECT COUNT(*) INTO v_total_contacts FROM contacts WHERE workspace_id = p_workspace_id AND created_by = p_user_id AND is_deleted = FALSE;
+  SELECT COUNT(*) INTO v_calls_today FROM contact_activities
+  WHERE workspace_id = p_workspace_id AND created_by = p_user_id AND activity_type = 'called' AND created_at::date = CURRENT_DATE;
+
+  SELECT COUNT(*) INTO v_interviews_scheduled_today FROM interviews
+  WHERE workspace_id = p_workspace_id AND created_by = p_user_id AND created_at >= CURRENT_DATE;
   
+  SELECT COUNT(*) INTO v_interviews_attended_today FROM interviews
+  WHERE workspace_id = p_workspace_id AND created_by = p_user_id AND interview_date = CURRENT_DATE AND status = 'attended';
+
+  SELECT COUNT(*) INTO v_walkins_today FROM contact_activities
+  WHERE workspace_id = p_workspace_id AND created_by = p_user_id AND activity_type = 'visited' AND created_at::date = CURRENT_DATE;
+
+  SELECT COUNT(*) INTO v_recharges_today FROM contact_activities
+  WHERE workspace_id = p_workspace_id AND created_by = p_user_id AND activity_type = 'recharged' AND created_at::date = CURRENT_DATE;
+
+  SELECT COUNT(*) INTO v_trainings_today FROM contact_activities
+  WHERE workspace_id = p_workspace_id AND created_by = p_user_id AND activity_type = 'training_started' AND created_at::date = CURRENT_DATE;
+
+  SELECT COUNT(*) INTO v_activations_today FROM contact_activities
+  WHERE workspace_id = p_workspace_id AND created_by = p_user_id AND activity_type = 'activated' AND created_at::date = CURRENT_DATE;
+
+  -- 3. Follow-ups
+  SELECT COUNT(*) INTO v_followups_pending FROM follow_ups
+  WHERE workspace_id = p_workspace_id AND created_by = p_user_id AND status = 'pending' AND follow_up_date < CURRENT_DATE;
+  
+  SELECT COUNT(*) INTO v_followups_today FROM follow_ups
+  WHERE workspace_id = p_workspace_id AND created_by = p_user_id AND status = 'pending' AND follow_up_date = CURRENT_DATE;
+
+  -- 4. Contact Metrics
+  SELECT COUNT(*) INTO v_total_contacts FROM contacts WHERE workspace_id = p_workspace_id AND created_by = p_user_id AND is_deleted = FALSE;
   SELECT COUNT(*) INTO v_active_contacts FROM opportunities 
   WHERE workspace_id = p_workspace_id AND status NOT IN ('lost', 'completed', 'activated') 
   AND contact_id IN (SELECT id FROM contacts WHERE created_by = p_user_id);
 
-  -- 3. Referral Metrics
+  -- 5. Referral Metrics
   SELECT COUNT(*) INTO v_pending_referrals FROM referrals WHERE workspace_id = p_workspace_id AND status = 'pending';
-  SELECT COUNT(*) INTO v_paid_referrals FROM referrals WHERE workspace_id = p_workspace_id AND reward_status = 'paid';
+  SELECT COUNT(*) INTO v_paid_referrals FROM referrals WHERE workspace_id = p_workspace_id AND status = 'paid';
 
   RETURN jsonb_build_object(
-    'mission', jsonb_build_object('walkinsToday', v_walkins_today, 'followupsPending', v_followups_pending, 'targetRemaining', v_target_remaining),
+    'mission', jsonb_build_object(
+      'leads', jsonb_build_object('actual', v_leads_today, 'target', t_leads),
+      'calls', jsonb_build_object('actual', v_calls_today, 'target', t_calls),
+      'interviews', jsonb_build_object('actual', v_interviews_scheduled_today, 'target', t_interviews),
+      'walkins', jsonb_build_object('actual', v_walkins_today, 'target', t_walkins),
+      'recharges', jsonb_build_object('actual', v_recharges_today, 'target', t_recharges),
+      'trainings', jsonb_build_object('actual', v_trainings_today, 'target', t_trainings),
+      'activations', jsonb_build_object('actual', v_activations_today, 'target', t_activations),
+      'followupsPending', v_followups_pending,
+      'followupsToday', v_followups_today,
+      -- Backwards compatibility
+      'walkinsToday', v_walkins_today,
+      'targetRemaining', GREATEST(0, t_walkins - v_walkins_today)
+    ),
     'contacts', jsonb_build_object('total', v_total_contacts, 'active', v_active_contacts),
     'referrals', jsonb_build_object('pending', v_pending_referrals, 'paid', v_paid_referrals)
   );
@@ -627,6 +801,41 @@ CREATE POLICY opportunity_types_all ON opportunity_types FOR ALL
 -- Contacts: users can CRUD contacts in their workspace
 CREATE POLICY contacts_select ON contacts FOR SELECT
   USING (workspace_id IN (SELECT get_user_workspaces()));
+
+CREATE POLICY "Users can create referrals"
+  ON referrals FOR INSERT
+  WITH CHECK (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can update referrals"
+  ON referrals FOR UPDATE
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+ALTER TABLE interviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE follow_ups ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their workspace interviews"
+  ON interviews FOR SELECT
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can create their workspace interviews"
+  ON interviews FOR INSERT
+  WITH CHECK (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can update their workspace interviews"
+  ON interviews FOR UPDATE
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can view their workspace follow_ups"
+  ON follow_ups FOR SELECT
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can create their workspace follow_ups"
+  ON follow_ups FOR INSERT
+  WITH CHECK (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can update their workspace follow_ups"
+  ON follow_ups FOR UPDATE
+  USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
 
 CREATE POLICY contacts_insert ON contacts FOR INSERT
   WITH CHECK (workspace_id IN (SELECT get_user_workspaces()));
@@ -697,3 +906,278 @@ CREATE POLICY "Avatar images are publicly accessible." ON storage.objects FOR SE
 CREATE POLICY "Users can upload avatars." ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'avatars' AND auth.role() = 'authenticated');
 CREATE POLICY "Users can update their own avatars." ON storage.objects FOR UPDATE USING (bucket_id = 'avatars' AND auth.uid() = owner);
 
+-- =============================================================================
+-- SPRINT 5A: OMNI-CHANNEL MARKETING DATA MODEL
+-- Foundation for Lead Acquisition Operating System
+-- =============================================================================
+
+-- 1. Create Enum Types
+CREATE TYPE marketing_source_type AS ENUM (
+  'instagram',
+  'facebook',
+  'meta_ads',
+  'google_ads',
+  'field',
+  'agent',
+  'walk_in',
+  'referral',
+  'whatsapp',
+  'organic',
+  'manual'
+);
+
+CREATE TYPE marketing_campaign_status AS ENUM (
+  'active',
+  'paused',
+  'completed'
+);
+
+CREATE TYPE marketing_creative_type AS ENUM (
+  'image',
+  'video',
+  'carousel',
+  'text'
+);
+
+CREATE TYPE marketing_touchpoint_type AS ENUM (
+  'lead_created',
+  'reel_viewed',
+  'story_viewed',
+  'ad_clicked',
+  'dm_sent',
+  'phone_called',
+  'followup',
+  'interview',
+  'selected',
+  'recharge',
+  'joined',
+  'lost'
+);
+
+CREATE TYPE marketing_source_system AS ENUM (
+  'manual',
+  'meta_api',
+  'google_ads_api',
+  'csv_import',
+  'google_form',
+  'whatsapp',
+  'system'
+);
+
+CREATE TYPE marketing_import_status AS ENUM (
+  'pending',
+  'processing',
+  'completed',
+  'failed'
+);
+
+-- =============================================================================
+-- 2. Core Hierarchy Tables
+-- =============================================================================
+
+-- MARKETING SOURCES (The Root)
+CREATE TABLE marketing_sources (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  type marketing_source_type NOT NULL,
+  created_by UUID REFERENCES auth.users(id),
+  updated_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- MARKETING CAMPAIGNS (Optional, belongs to Source)
+CREATE TABLE marketing_campaigns (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  source_id UUID NOT NULL REFERENCES marketing_sources(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  status marketing_campaign_status DEFAULT 'active',
+  budget DECIMAL(12, 2),
+  start_date TIMESTAMPTZ,
+  end_date TIMESTAMPTZ,
+  created_by UUID REFERENCES auth.users(id),
+  updated_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- MARKETING AD SETS (Optional, belongs to Campaign)
+CREATE TABLE marketing_ad_sets (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  campaign_id UUID NOT NULL REFERENCES marketing_campaigns(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  target_audience JSONB DEFAULT '{}',
+  daily_budget DECIMAL(12, 2),
+  created_by UUID REFERENCES auth.users(id),
+  updated_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- MARKETING CREATIVES (Optional, belongs to Ad Set or Campaign directly)
+CREATE TABLE marketing_creatives (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  ad_set_id UUID REFERENCES marketing_ad_sets(id) ON DELETE CASCADE,
+  campaign_id UUID REFERENCES marketing_campaigns(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  type marketing_creative_type NOT NULL,
+  url TEXT,
+  created_by UUID REFERENCES auth.users(id),
+  updated_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  -- Ensure it belongs to at least one parent
+  CONSTRAINT chk_creative_parent CHECK (ad_set_id IS NOT NULL OR campaign_id IS NOT NULL)
+);
+
+-- =============================================================================
+-- 3. Analytics & Attribution Tables
+-- =============================================================================
+
+-- MARKETING ATTRIBUTIONS (The Junction, 1:1 with Contacts)
+CREATE TABLE marketing_attributions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  contact_id UUID NOT NULL UNIQUE REFERENCES contacts(id) ON DELETE CASCADE,
+  source_id UUID NOT NULL REFERENCES marketing_sources(id) ON DELETE RESTRICT,
+  campaign_id UUID REFERENCES marketing_campaigns(id) ON DELETE SET NULL,
+  ad_set_id UUID REFERENCES marketing_ad_sets(id) ON DELETE SET NULL,
+  creative_id UUID REFERENCES marketing_creatives(id) ON DELETE SET NULL,
+  
+  -- Flexible identifier for organic/manual (e.g., "Muktadir", "Commercial Street")
+  source_reference TEXT,
+  
+  -- Standard UTMs for web traffic
+  utm_source TEXT,
+  utm_medium TEXT,
+  utm_campaign TEXT,
+  click_id TEXT,
+  
+  created_by UUID REFERENCES auth.users(id),
+  updated_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- MARKETING TOUCHPOINTS (The Analytics Engine)
+CREATE TABLE marketing_touchpoints (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
+  attribution_id UUID REFERENCES marketing_attributions(id) ON DELETE SET NULL,
+  event_type marketing_touchpoint_type NOT NULL,
+  source_system marketing_source_system NOT NULL DEFAULT 'system',
+  metadata JSONB DEFAULT '{}',
+  created_by UUID REFERENCES auth.users(id),
+  updated_by UUID REFERENCES auth.users(id),
+  timestamp TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- MARKETING DAILY METRICS (For external API ingestion)
+CREATE TABLE marketing_daily_metrics (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  campaign_id UUID NOT NULL REFERENCES marketing_campaigns(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  spend DECIMAL(12, 2) DEFAULT 0,
+  reach INT DEFAULT 0,
+  impressions INT DEFAULT 0,
+  clicks INT DEFAULT 0,
+  cpc DECIMAL(10, 4) DEFAULT 0,
+  cpm DECIMAL(10, 4) DEFAULT 0,
+  ctr DECIMAL(5, 4) DEFAULT 0,
+  leads INT DEFAULT 0,
+  created_by UUID REFERENCES auth.users(id),
+  updated_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(campaign_id, date)
+);
+
+-- MARKETING IMPORTS (Audit log for external integrations)
+CREATE TABLE marketing_imports (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL, -- e.g., 'meta_api', 'google_ads_api', 'csv'
+  started_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  status marketing_import_status DEFAULT 'pending',
+  records_processed INT DEFAULT 0,
+  records_inserted INT DEFAULT 0,
+  records_updated INT DEFAULT 0,
+  metadata JSONB DEFAULT '{}',
+  created_by UUID REFERENCES auth.users(id),
+  updated_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================================================
+-- 4. Indexes for Analytics Performance
+-- =============================================================================
+
+CREATE INDEX idx_marketing_sources_workspace ON marketing_sources(workspace_id);
+CREATE INDEX idx_marketing_campaigns_source ON marketing_campaigns(source_id);
+CREATE INDEX idx_marketing_ad_sets_campaign ON marketing_ad_sets(campaign_id);
+CREATE INDEX idx_marketing_creatives_ad_set ON marketing_creatives(ad_set_id);
+CREATE INDEX idx_marketing_creatives_campaign ON marketing_creatives(campaign_id);
+
+CREATE INDEX idx_marketing_attributions_contact ON marketing_attributions(contact_id);
+CREATE INDEX idx_marketing_attributions_source ON marketing_attributions(source_id, campaign_id);
+CREATE INDEX idx_marketing_touchpoints_contact_type ON marketing_touchpoints(contact_id, event_type);
+CREATE INDEX idx_marketing_touchpoints_timestamp ON marketing_touchpoints(timestamp);
+CREATE INDEX idx_marketing_daily_metrics_campaign_date ON marketing_daily_metrics(campaign_id, date);
+CREATE INDEX idx_marketing_imports_workspace ON marketing_imports(workspace_id);
+
+-- =============================================================================
+-- 5. Row Level Security (RLS)
+-- =============================================================================
+
+ALTER TABLE marketing_sources ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marketing_campaigns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marketing_ad_sets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marketing_creatives ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marketing_attributions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marketing_touchpoints ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marketing_daily_metrics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marketing_imports ENABLE ROW LEVEL SECURITY;
+
+-- Sources RLS
+CREATE POLICY "Users can view workspace sources" ON marketing_sources FOR SELECT USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+CREATE POLICY "Users can insert workspace sources" ON marketing_sources FOR INSERT WITH CHECK (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+CREATE POLICY "Users can update workspace sources" ON marketing_sources FOR UPDATE USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+
+-- Campaigns RLS
+CREATE POLICY "Users can view workspace campaigns" ON marketing_campaigns FOR SELECT USING (source_id IN (SELECT id FROM marketing_sources WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())));
+CREATE POLICY "Users can insert workspace campaigns" ON marketing_campaigns FOR INSERT WITH CHECK (source_id IN (SELECT id FROM marketing_sources WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())));
+CREATE POLICY "Users can update workspace campaigns" ON marketing_campaigns FOR UPDATE USING (source_id IN (SELECT id FROM marketing_sources WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())));
+
+-- Ad Sets RLS
+CREATE POLICY "Users can view workspace ad sets" ON marketing_ad_sets FOR SELECT USING (campaign_id IN (SELECT id FROM marketing_campaigns WHERE source_id IN (SELECT id FROM marketing_sources WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()))));
+CREATE POLICY "Users can insert workspace ad sets" ON marketing_ad_sets FOR INSERT WITH CHECK (campaign_id IN (SELECT id FROM marketing_campaigns WHERE source_id IN (SELECT id FROM marketing_sources WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()))));
+CREATE POLICY "Users can update workspace ad sets" ON marketing_ad_sets FOR UPDATE USING (campaign_id IN (SELECT id FROM marketing_campaigns WHERE source_id IN (SELECT id FROM marketing_sources WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()))));
+
+-- Creatives RLS
+CREATE POLICY "Users can view workspace creatives" ON marketing_creatives FOR SELECT USING (ad_set_id IN (SELECT id FROM marketing_ad_sets WHERE campaign_id IN (SELECT id FROM marketing_campaigns WHERE source_id IN (SELECT id FROM marketing_sources WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())))) OR campaign_id IN (SELECT id FROM marketing_campaigns WHERE source_id IN (SELECT id FROM marketing_sources WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()))));
+CREATE POLICY "Users can insert workspace creatives" ON marketing_creatives FOR INSERT WITH CHECK (ad_set_id IN (SELECT id FROM marketing_ad_sets WHERE campaign_id IN (SELECT id FROM marketing_campaigns WHERE source_id IN (SELECT id FROM marketing_sources WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())))) OR campaign_id IN (SELECT id FROM marketing_campaigns WHERE source_id IN (SELECT id FROM marketing_sources WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()))));
+CREATE POLICY "Users can update workspace creatives" ON marketing_creatives FOR UPDATE USING (ad_set_id IN (SELECT id FROM marketing_ad_sets WHERE campaign_id IN (SELECT id FROM marketing_campaigns WHERE source_id IN (SELECT id FROM marketing_sources WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())))) OR campaign_id IN (SELECT id FROM marketing_campaigns WHERE source_id IN (SELECT id FROM marketing_sources WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()))));
+
+-- Attributions RLS
+CREATE POLICY "Users can view workspace attributions" ON marketing_attributions FOR SELECT USING (contact_id IN (SELECT id FROM contacts WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())));
+CREATE POLICY "Users can insert workspace attributions" ON marketing_attributions FOR INSERT WITH CHECK (contact_id IN (SELECT id FROM contacts WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())));
+CREATE POLICY "Users can update workspace attributions" ON marketing_attributions FOR UPDATE USING (contact_id IN (SELECT id FROM contacts WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid())));
+
+-- Touchpoints RLS
+CREATE POLICY "Users can view workspace touchpoints" ON marketing_touchpoints FOR SELECT USING (attribution_id IN (SELECT id FROM marketing_attributions WHERE contact_id IN (SELECT id FROM contacts WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()))));
+CREATE POLICY "Users can insert workspace touchpoints" ON marketing_touchpoints FOR INSERT WITH CHECK (attribution_id IN (SELECT id FROM marketing_attributions WHERE contact_id IN (SELECT id FROM contacts WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()))));
+CREATE POLICY "Users can update workspace touchpoints" ON marketing_touchpoints FOR UPDATE USING (attribution_id IN (SELECT id FROM marketing_attributions WHERE contact_id IN (SELECT id FROM contacts WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()))));
+
+-- Daily Metrics RLS
+CREATE POLICY "Users can view workspace daily metrics" ON marketing_daily_metrics FOR SELECT USING (campaign_id IN (SELECT id FROM marketing_campaigns WHERE source_id IN (SELECT id FROM marketing_sources WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()))));
+CREATE POLICY "Users can insert workspace daily metrics" ON marketing_daily_metrics FOR INSERT WITH CHECK (campaign_id IN (SELECT id FROM marketing_campaigns WHERE source_id IN (SELECT id FROM marketing_sources WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()))));
+CREATE POLICY "Users can update workspace daily metrics" ON marketing_daily_metrics FOR UPDATE USING (campaign_id IN (SELECT id FROM marketing_campaigns WHERE source_id IN (SELECT id FROM marketing_sources WHERE workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()))));
+
+-- Imports RLS
+CREATE POLICY "Users can view workspace imports" ON marketing_imports FOR SELECT USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+CREATE POLICY "Users can insert workspace imports" ON marketing_imports FOR INSERT WITH CHECK (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));
+CREATE POLICY "Users can update workspace imports" ON marketing_imports FOR UPDATE USING (workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = auth.uid()));

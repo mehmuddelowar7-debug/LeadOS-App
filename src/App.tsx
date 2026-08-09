@@ -8,27 +8,35 @@ import { supabase } from "@/lib/supabase"
 import { useAuthStore } from "@/features/auth/AuthStore"
 import { LoginView } from "@/features/auth/LoginView"
 import { ProtectedRoute } from "@/features/auth/ProtectedRoute"
-import { InsightsView } from "@/features/dashboard/InsightsView"
 import { ContactEntryView } from "@/features/contacts/ContactEntryView"
-import { QueueLayout } from "@/features/followups/QueueLayout"
 import { NetworkProvider } from "@/components/providers/NetworkProvider"
 import { ContactProfileView } from "@/features/contacts/ContactProfileView"
 import { ROUTES } from "@/lib/routes"
 import { NotFoundRedirect } from "@/components/layout/NotFoundRedirect"
 import { RouteErrorBoundary } from "@/components/providers/RouteErrorBoundary"
+import { initializeRealtimeBridge } from "@/sdk/events"
 
 // Lazy load non-critical routes
 const AnalyticsView = lazy(() => import("@/features/analytics/AnalyticsView").then(m => ({ default: m.AnalyticsView })))
 const ProfileView = lazy(() => import("@/features/profile/ProfileView").then(m => ({ default: m.ProfileView })))
-const IncentiveTrackerView = lazy(() => import("@/features/incentives/IncentiveTrackerView").then(m => ({ default: m.IncentiveTrackerView })))
 import { KeepAliveTabs } from "@/components/layout/KeepAliveTabs"
 import { RouteTracker } from "@/components/dev/RouteTracker"
-import { DashboardView } from "@/features/dashboard/DashboardView"
+import { OperationsCenterView } from "@/features/operations/OperationsCenterView"
 import { ContactsLayout } from "@/features/contacts/ContactsLayout"
-import { ReferralDashboardView } from "@/features/referrals/ReferralDashboardView"
 import { SetupScreen } from "@/features/dev/SetupScreen"
 import { HealthView } from "@/features/dev/HealthView"
 import { PWAUpdater } from "@/components/layout/PWAUpdater"
+import { SystemHealthView } from "@/features/dev/SystemHealthView"
+
+import { PipelineLayout } from "@/features/pipeline/PipelineLayout"
+import { MarketingLayout } from "@/features/marketing/components/MarketingLayout"
+import { MarketingHomeView } from "@/features/marketing/MarketingHomeView"
+import { MarketingSourceView } from "@/features/marketing/MarketingSourceView"
+import { MarketingCampaignView } from "@/features/marketing/MarketingCampaignView"
+import { MarketingCreativeView } from "@/features/marketing/MarketingCreativeView"
+import { MarketingImportsView } from "@/features/marketing/MarketingImportsView"
+
+// Marketing modules are imported at top
 
 // Loading Fallback
 const PageLoader = () => (
@@ -42,7 +50,7 @@ const ChunkErrorScreen = () => (
     <AlertTriangle className="h-12 w-12 text-destructive mb-6" />
     <h1 className="text-2xl font-bold mb-3">Application Update Error</h1>
     <p className="text-muted-foreground text-sm max-w-md mb-8">
-      We encountered a problem loading the latest version of LeadOS. This usually happens if your browser cached an old version during a deployment.
+      We encountered a problem loading the latest version of RecruitOS. This usually happens if your browser cached an old version during a deployment.
     </p>
     <button 
       onClick={() => {
@@ -62,10 +70,13 @@ function App() {
   const [bootState, setBootState] = useState<'pending' | 'ready' | 'setup' | 'error'>('pending')
 
   useEffect(() => {
+    // Initialize Realtime Bridge for Webhooks
+    const cleanupRealtime = initializeRealtimeBridge()
+
     // Run diagnostics silently. If ready, bypass SetupScreen.
     import('@/lib/diagnostics').then(({ runStartupDiagnostics }) => {
       runStartupDiagnostics().then(res => {
-        sessionStorage.removeItem('leadOS_chunk_reload')
+        sessionStorage.removeItem('recruitOS_chunk_reload')
         if (res.isReady) {
           setBootState('ready')
         } else {
@@ -82,11 +93,11 @@ function App() {
       if (isChunkError) {
         import('@sentry/react').then(Sentry => Sentry.captureException(err)).catch(() => {})
         
-        if (!sessionStorage.getItem('leadOS_chunk_reload')) {
-          sessionStorage.setItem('leadOS_chunk_reload', 'true')
+        if (!sessionStorage.getItem('recruitOS_chunk_reload')) {
+          sessionStorage.setItem('recruitOS_chunk_reload', 'true')
           window.location.reload()
         } else {
-          sessionStorage.removeItem('leadOS_chunk_reload')
+          sessionStorage.removeItem('recruitOS_chunk_reload')
           setBootState('error')
         }
       } else {
@@ -104,7 +115,10 @@ function App() {
       setUser(session?.user ?? null)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+      cleanupRealtime()
+    }
   }, [setUser])
 
   if (bootState === 'pending') {
@@ -135,6 +149,7 @@ function App() {
           <RouteTracker />
           <Routes>
             <Route path={ROUTES.HEALTH} element={<HealthView />} />
+            <Route path={ROUTES.SYSTEM} element={<SystemHealthView />} />
             <Route path={ROUTES.AUTH} element={<LoginView />} />
 
             <Route element={<ProtectedRoute />}>
@@ -146,22 +161,26 @@ function App() {
                 </NetworkProvider>
               }>
                 <Route element={<KeepAliveTabs />}>
-                  <Route path={ROUTES.HOME} element={<DashboardView />} />
+                  {/* ── Core Routes ── */}
+                  <Route path={ROUTES.HOME} element={<OperationsCenterView />} />
+                  <Route path={`${ROUTES.PIPELINE}/*`} element={<PipelineLayout />} />
                   <Route path={ROUTES.CONTACTS} element={<ContactsLayout />} />
-                  <Route path={ROUTES.REFERRALS} element={<ReferralDashboardView />} />
-                  
-                  <Route path={ROUTES.INSIGHTS} element={<InsightsView />} />
+                  <Route path={ROUTES.MARKETING} element={<MarketingLayout />}>
+                    <Route index element={<MarketingHomeView />} />
+                    <Route path="imports" element={<MarketingImportsView />} />
+                    <Route path="sources/:id" element={<MarketingSourceView />} />
+                    <Route path="campaigns/:id" element={<MarketingCampaignView />} />
+                    <Route path="creatives/:id" element={<MarketingCreativeView />} />
+                  </Route>
+                  <Route path={ROUTES.PROFILE} element={<ProfileView />} />
+
+                  {/* ── Secondary Routes ── */}
                   <Route path={ROUTES.CONTACTS_NEW} element={<ContactEntryView />} />
                   <Route path={ROUTES.QUICK_CAPTURE} element={<ContactEntryView />} />
-                  <Route path={ROUTES.QUEUE} element={<QueueLayout />}>
-                    <Route path="calls" element={<div className="p-4">Call Queue</div>} />
-                    <Route path="whatsapp" element={<div className="p-4">WhatsApp Queue</div>} />
-                    <Route path="pending" element={<div className="p-4">Pending Sync</div>} />
-                  </Route>
                   <Route path={ROUTES.ANALYTICS} element={<AnalyticsView />} />
-                  <Route path={ROUTES.PROFILE} element={<ProfileView />} />
-                  <Route path={ROUTES.INCENTIVES} element={<IncentiveTrackerView />} />
                   <Route path={ROUTES.CONTACT_DETAILS} element={<ContactProfileView />} />
+
+
                 </Route>
               </Route>
             </Route>

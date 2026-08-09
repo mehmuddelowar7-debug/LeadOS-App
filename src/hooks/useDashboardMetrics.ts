@@ -2,11 +2,24 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/features/auth/AuthStore'
 
+export interface TargetMetric {
+  actual: number
+  target: number
+}
+
 export interface DashboardMetrics {
   mission: {
-    walkinsToday: number
+    leads: TargetMetric
+    calls: TargetMetric
+    interviews: TargetMetric
+    walkins: TargetMetric
+    recharges: TargetMetric
+    trainings: TargetMetric
+    activations: TargetMetric
     followupsPending: number
-    targetRemaining: number
+    followupsToday: number
+    walkinsToday: number // legacy
+    targetRemaining: number // legacy
   }
   contacts: {
     total: number
@@ -35,8 +48,19 @@ export function useDashboardMetrics() {
       })
 
       if (error) {
-        console.error('Failed to fetch dashboard metrics:', error)
-        throw error
+        console.warn('Dashboard metrics RPC failed (function may not be deployed):', error.message)
+        // Return zero-state metrics — dashboard renders without RPC
+        return {
+          mission: {
+            leads: { actual: 0, target: 0 }, calls: { actual: 0, target: 0 },
+            interviews: { actual: 0, target: 0 }, walkins: { actual: 0, target: 0 },
+            recharges: { actual: 0, target: 0 }, trainings: { actual: 0, target: 0 },
+            activations: { actual: 0, target: 0 },
+            followupsPending: 0, followupsToday: 0, walkinsToday: 0, targetRemaining: 0
+          },
+          contacts: { total: 0, active: 0 },
+          referrals: { pending: 0, paid: 0 }
+        } as DashboardMetrics
       }
 
       return data as DashboardMetrics

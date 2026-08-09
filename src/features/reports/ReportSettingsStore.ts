@@ -11,7 +11,7 @@ export interface HistoricalReport {
 export type MentionTemplate = 'urban_company' | 'custom'
 export type ReportTemplateType = 'A' | 'B' | 'C'
 
-export type FieldKey = 'date' | 'leads' | 'walkin' | 'screening' | 'recharge' | 'training' | 'activation' | 'rejected' | 'expected_walkin' | 'comments' | 'mentions'
+export type FieldKey = 'date' | 'leads' | 'calls' | 'interviews_scheduled' | 'interviews_attended' | 'walkin' | 'screening' | 'recharge' | 'training' | 'activation' | 'rejected' | 'expected_walkin' | 'referral_commission' | 'comments' | 'mentions'
 
 export interface ReportSettingsState {
   mentionTemplate: MentionTemplate
@@ -37,8 +37,8 @@ export interface ReportSettingsState {
 }
 
 const DEFAULT_ORDER: FieldKey[] = [
-  'date', 'leads', 'walkin', 'expected_walkin', 'screening', 
-  'recharge', 'training', 'activation', 'rejected', 'comments', 'mentions'
+  'date', 'leads', 'calls', 'interviews_scheduled', 'interviews_attended', 'walkin', 'expected_walkin', 'screening', 
+  'recharge', 'training', 'activation', 'referral_commission', 'rejected', 'comments', 'mentions'
 ]
 
 export const useReportSettingsStore = create<ReportSettingsState>()(

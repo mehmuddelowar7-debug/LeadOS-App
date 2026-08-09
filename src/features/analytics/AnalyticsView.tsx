@@ -3,7 +3,7 @@ import { Target, Loader2, Download, TrendingUp, Users } from 'lucide-react'
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics'
 import { toast } from 'sonner'
 import { downloadCsv, jsonToCsv } from '@/lib/export'
-import { supabase } from '@/lib/supabase'
+import { exportEndDayContacts, exportWeeklyContacts, exportMonthlyContacts, exportReferrals } from './queries'
 import { useAuthStore } from '@/features/auth/AuthStore'
 
 export function AnalyticsView() {
@@ -23,27 +23,15 @@ export function AnalyticsView() {
       
       if (type === 'end_day') {
         const startOfDay = new Date(today.setHours(0,0,0,0)).toISOString()
-        const res = await supabase.from('contacts').select('id, name, phone, roles, origin, current_area, created_at').eq('workspace_id', workspaceId).gte('created_at', startOfDay)
-        data = res.data
+        data = await exportEndDayContacts(workspaceId, startOfDay)
       } else if (type === 'weekly') {
         const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
-        const res = await supabase.from('contacts').select('id, name, phone, roles, origin, current_area, created_at').eq('workspace_id', workspaceId).gte('created_at', lastWeek)
-        data = res.data
+        data = await exportWeeklyContacts(workspaceId, lastWeek)
       } else if (type === 'monthly') {
         const lastMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
-        const res = await supabase.from('contacts').select('id, name, phone, roles, origin, current_area, created_at').eq('workspace_id', workspaceId).gte('created_at', lastMonth)
-        data = res.data
+        data = await exportMonthlyContacts(workspaceId, lastMonth)
       } else if (type === 'referral') {
-        const res = await supabase.from('referrals').select('id, status, reward_status, reward_amount, payment_method, created_at, contacts(name, phone)').eq('workspace_id', workspaceId)
-        data = res.data?.map(r => {
-          const contact = Array.isArray(r.contacts) ? r.contacts[0] : r.contacts
-          return {
-            ...r,
-            referrer_name: contact?.name,
-            referrer_phone: contact?.phone,
-            contacts: undefined 
-          }
-        }) || null
+        data = await exportReferrals(workspaceId)
       }
       
       if (data && data.length > 0) {
@@ -84,7 +72,7 @@ export function AnalyticsView() {
         <div className="grid grid-cols-2 gap-4">
           <div className="glass-card rounded-[24px] p-6 bg-primary/10 border-primary/20 flex flex-col justify-between shadow-sm touch-target col-span-2">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-bold text-primary uppercase tracking-wider">Network Size</span>
+              <span className="text-sm font-bold text-primary uppercase tracking-wider">Candidate Pool</span>
               <Users className="h-6 w-6 text-primary" />
             </div>
             <div className="text-5xl font-black text-foreground tracking-tighter">{metrics?.contacts.total || 0}</div>

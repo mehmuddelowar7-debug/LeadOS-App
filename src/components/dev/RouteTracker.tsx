@@ -3,6 +3,7 @@ import { useLocation } from 'react-router'
 import { useIsFetching } from '@tanstack/react-query'
 import { usePerformanceStore } from '@/hooks/usePerformanceStore'
 import { IS_PERF_MODE } from './PerformanceProfiler'
+import { analytics } from '@/lib/analytics'
 
 export function RouteTracker() {
   const location = useLocation()
@@ -115,6 +116,11 @@ export function RouteTracker() {
       }
       checkDataReady()
     })
+
+    return () => {
+      const durationMs = performance.now() - navStart
+      analytics.trackScreenView(pathname, durationMs)
+    }
   }, [location.pathname])
 
   return null

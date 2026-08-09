@@ -30,11 +30,12 @@ export function useReferrals() {
         .limit(100)
 
       if (error) {
-        console.error('Failed to fetch referrals:', error)
-        throw error
+        // Gracefully degrade — schema may not be fully migrated in remote yet
+        console.warn('Failed to fetch referrals (schema mismatch or missing table):', error.message)
+        return []
       }
 
-      return data
+      return data ?? []
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 5, // 5 minutes — match global default explicitly

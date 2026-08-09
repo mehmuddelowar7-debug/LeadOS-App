@@ -3,6 +3,7 @@ import type { PersistedClient, Persister } from '@tanstack/react-query-persist-c
 import { supabase } from './supabase'
 import { toast } from 'sonner'
 import { logger } from './logger'
+import { analytics } from './analytics'
 
 // ============================================================================
 // React Query Cache Persister (Read cache)
@@ -143,9 +144,11 @@ export async function syncOfflineMutations(retryCount = 0) {
         if (error) throw error
       }
       successCount++
+      analytics.trackSyncResult(true)
     } catch (error) {
       logger.error('Failed to sync mutation', error, { mutation })
       failedMutations.push(mutation)
+      analytics.trackSyncResult(false)
     }
   }
 
