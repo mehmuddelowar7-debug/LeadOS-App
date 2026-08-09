@@ -3,7 +3,7 @@ import { CheckCircle, AlertTriangle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useImportStore, ColumnMapping } from '../store/importStore'
 import { normalizePhone, normalizeString, normalizeDate } from '@/lib/importer/normalizer'
-import { mapPipelineStage, mapSource } from '@/lib/importer/enumMappings'
+import { mapPipelineStage, mapSource, mapConnectionStatus, mapCandidateCategory } from '@/lib/importer/enumMappings'
 import { supabase } from '@/lib/supabase/client'
 import { useAuthStore } from '@/features/auth/store/authStore'
 
@@ -127,13 +127,18 @@ export function ProgressStep() {
         else if (g?.startsWith('f')) result.gender = 'female'
         else result.gender = 'other'
       }
+      else if (m.dbField === 'connection_status') result.connection_status = mapConnectionStatus(rawVal)
       else if (m.dbField === 'origin') result.origin = mapSource(rawVal)
       else if (m.dbField === 'current_area') result.current_area = normalizeString(rawVal)
+      else if (m.dbField === 'notes') result.notes = normalizeString(rawVal)
       
       // Opportunity
       else if (m.dbField === 'opportunity.highest_qualification') result.opportunity.highest_qualification = normalizeString(rawVal)
+      else if (m.dbField === 'opportunity.current_occupation') result.opportunity.current_occupation = normalizeString(rawVal)
+      else if (m.dbField === 'opportunity.current_salary') result.opportunity.current_salary = parseInt(String(rawVal).replace(/\D/g, '')) || 0
       else if (m.dbField === 'opportunity.total_experience') result.opportunity.total_experience = parseInt(rawVal) || 0
       else if (m.dbField === 'opportunity.status') result.opportunity.status = mapPipelineStage(rawVal)
+      else if (m.dbField === 'opportunity.candidate_category') result.opportunity.candidate_category = mapCandidateCategory(rawVal)
       
       // Dates
       else if (m.dbField === 'follow_up_date') result.follow_up_date = normalizeDate(rawVal)
@@ -142,7 +147,14 @@ export function ProgressStep() {
       // Custom Fields
       else if (m.dbField.startsWith('custom_fields.')) {
         const fieldName = m.dbField.replace('custom_fields.', '')
-        result.custom_fields[fieldName] = normalizeString(rawVal)
+        
+        // Boolean conversion for specific fields
+        if (fieldName === 'google_form_filled' || fieldName === 'currently_in_blr' || fieldName === 'pr_done' || fieldName === 'agent_referral') {
+          const val = String(rawVal).toLowerCase().trim()
+          result.custom_fields[fieldName] = val === 'yes' || val === 'true' || val === '1'
+        } else {
+          result.custom_fields[fieldName] = normalizeString(rawVal)
+        }
       }
     })
 
