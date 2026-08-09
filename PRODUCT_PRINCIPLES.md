@@ -40,3 +40,6 @@ Before any major feature goes to real users, it must be used by the team interna
 
 ## 13. One Source of Truth
 **Every business rule exists in exactly one place.** Avoid duplicating workflow logic between the frontend, backend, AI prompts, and SQL. Business rules should be centralized and reused.
+
+## 14. Continuous Clarity
+**A recruiter should never wonder "What do I do next?"** Every screen must proactively answer this question. Reduce thinking, not just clicking.
