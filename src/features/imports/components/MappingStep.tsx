@@ -15,22 +15,22 @@ const TARGET_FIELDS = [
   { value: 'current_area', label: 'Current Area' },
   { value: 'notes', label: 'Comments / Notes' },
   { value: 'opportunity.candidate_category', label: 'Candidate Category (NE?)' },
-  { value: 'opportunity.highest_qualification', label: 'Highest Qualification' },
-  { value: 'opportunity.current_occupation', label: 'Current Occupation' },
-  { value: 'opportunity.current_salary', label: 'Current Earning' },
-  { value: 'opportunity.total_experience', label: 'Total Experience (Years)' },
+  { value: 'hometown', label: 'Correct Hometown' },
+  { value: 'currently_in_bangalore', label: 'Currently in BLR?' },
+  { value: 'bangalore_tenure', label: 'Tenure in BLR' },
+  { value: 'education', label: 'Highest Qualification' },
+  { value: 'current_occupation', label: 'Current Occupation' },
+  { value: 'current_salary', label: 'Current Earning' },
+  { value: 'total_experience', label: 'Total Experience (Years)' },
   { value: 'opportunity.status', label: 'Pipeline Stage (Selection / State)' },
   { value: 'follow_up_date', label: 'Scheduling Date (Follow up)' },
   { value: 'walkin_date', label: 'Walk-in Date' },
-  { value: 'custom_fields.google_form_filled', label: 'Google Form Filled?' },
-  { value: 'custom_fields.currently_in_blr', label: 'Currently in BLR?' },
-  { value: 'custom_fields.blr_tenure', label: 'Tenure in BLR' },
-  { value: 'custom_fields.home_town', label: 'Correct Hometown' },
-  { value: 'custom_fields.pr_done', label: 'PR Done?' },
-  { value: 'custom_fields.pr_amount', label: 'PR Amount' },
-  { value: 'custom_fields.agent_referral', label: 'Agent Referral?' },
-  { value: 'custom_fields.agent_payment', label: 'Amount to be paid (Agent)' },
-  { value: 'custom_fields.bda_commission', label: 'BDA Commission to be received' },
+  { value: 'walkin_attended', label: 'Walk-in Attended?' },
+  { value: 'finance.pr_done', label: 'PR Done?' },
+  { value: 'finance.pr_amount', label: 'PR Amount' },
+  { value: 'finance.agent_referral', label: 'Agent Referral?' },
+  { value: 'finance.amount_to_be_paid', label: 'Amount to be paid (Agent)' },
+  { value: 'finance.bda_commission', label: 'BDA Commission to be received' },
 ]
 
 export function MappingStep() {
@@ -56,25 +56,25 @@ export function MappingStep() {
       if (lower.includes('gender')) dbField = 'gender'
       if (lower.includes('connection')) dbField = 'connection_status'
       if (lower.includes('source') || lower.includes('through') || lower.includes('marketing')) dbField = 'origin'
-      if (lower.includes('hometown')) dbField = 'custom_fields.home_town'
+      if (lower.includes('hometown')) dbField = 'hometown'
       if (lower.includes('area') || lower.includes('location')) dbField = 'current_area'
       if (lower.includes('comment') || lower.includes('note')) dbField = 'notes'
       
       if (lower.includes('ne?')) dbField = 'opportunity.candidate_category'
-      if (lower.includes('qualification')) dbField = 'opportunity.highest_qualification'
-      if (lower.includes('occupation')) dbField = 'opportunity.current_occupation'
-      if (lower.includes('earning') || lower.includes('salary')) dbField = 'opportunity.current_salary'
-      if (lower.includes('experience')) dbField = 'opportunity.total_experience'
+      if (lower.includes('qualification')) dbField = 'education'
+      if (lower.includes('occupation')) dbField = 'current_occupation'
+      if (lower.includes('earning') || lower.includes('salary')) dbField = 'current_salary'
+      if (lower.includes('experience')) dbField = 'total_experience'
       if (lower.includes('selection') || lower.includes('stage') || lower.includes('state')) dbField = 'opportunity.status'
       
-      if (lower.includes('google form')) dbField = 'custom_fields.google_form_filled'
-      if (lower.includes('currently in blr')) dbField = 'custom_fields.currently_in_blr'
-      if (lower.includes('tenure in blr')) dbField = 'custom_fields.blr_tenure'
-      if (lower.includes('pr done')) dbField = 'custom_fields.pr_done'
-      if (lower.includes('pr amount')) dbField = 'custom_fields.pr_amount'
-      if (lower.includes('agent referral')) dbField = 'custom_fields.agent_referral'
-      if (lower.includes('amount to be paid')) dbField = 'custom_fields.agent_payment'
-      if (lower.includes('bda') && lower.includes('commission')) dbField = 'custom_fields.bda_commission'
+      if (lower.includes('currently in blr')) dbField = 'currently_in_bangalore'
+      if (lower.includes('tenure in blr')) dbField = 'bangalore_tenure'
+      if (lower.includes('pr done')) dbField = 'finance.pr_done'
+      if (lower.includes('pr amount')) dbField = 'finance.pr_amount'
+      if (lower.includes('agent referral')) dbField = 'finance.agent_referral'
+      if (lower.includes('amount to be paid')) dbField = 'finance.amount_to_be_paid'
+      if (lower.includes('bda') && lower.includes('commission')) dbField = 'finance.bda_commission'
+      if (lower === 'walkin?' || lower === 'walk in?') dbField = 'walkin_attended'
       
       return { sheetColumn: header, dbField }
     })

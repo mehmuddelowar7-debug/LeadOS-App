@@ -37,51 +37,70 @@ export function ProgressStep() {
       return
     }
 
-    for (let i = 0; i < rawData.length; i++) {
-      const row = rawData[i]
-      setCurrentIndex(i + 1)
-      
-      try {
-        const payload = buildPayload(row, mappings, workspace.id, session.user.id)
+    const BATCH_SIZE = 100
+    const chunks = []
+    
+    // Split into batches
+    for (let i = 0; i < rawData.length; i += BATCH_SIZE) {
+      chunks.push(rawData.slice(i, i + BATCH_SIZE))
+    }
+
+    let processedCount = 0
+
+    for (const chunk of chunks) {
+      const batchPayload = []
+      const originalRows = []
+
+      for (const row of chunk) {
+        processedCount++
+        setCurrentIndex(processedCount)
         
-        // Skip completely empty rows or rows without phone numbers
-        if (!payload.phone) {
-          addFailedRow(row, 'Missing or invalid phone number')
-          continue
-        }
+        try {
+          const payload = buildPayload(row, mappings, workspace.id, session.user.id)
+          
+          if (!payload.phone) {
+            addFailedRow(row, 'Missing or invalid phone number')
+            continue
+          }
 
-        if (!payload.name) {
-          payload.name = 'Unknown Candidate'
-        }
+          if (!payload.name) {
+            payload.name = 'Unknown Candidate'
+          }
 
-        const { data, error } = await supabase.rpc('import_historical_candidate', {
-          payload
+          batchPayload.push(payload)
+          originalRows.push(row)
+        } catch (err: any) {
+          addFailedRow(row, err.message || 'Unknown error building payload')
+        }
+      }
+
+      if (batchPayload.length > 0) {
+        const { data, error } = await supabase.rpc('import_historical_batch_v3', {
+          batch_payload: batchPayload
         })
 
         if (error) {
-          addFailedRow(row, error.message)
-          continue
+          // Entire batch failed (network or fatal RPC error)
+          originalRows.forEach(row => addFailedRow(row, error.message))
+        } else if (Array.isArray(data)) {
+          // RPC returns array of results
+          data.forEach((result, idx) => {
+            const originalRow = originalRows[idx]
+            if (result.success === false) {
+              if (result.error === 'DUPLICATE') {
+                incrementSkipped()
+              } else {
+                addFailedRow(originalRow, result.error)
+              }
+            } else {
+              incrementImported()
+            }
+          })
         }
-
-        if (data && data.success === false) {
-          if (data.error === 'DUPLICATE') {
-            incrementSkipped()
-          } else {
-            addFailedRow(row, data.error)
-          }
-          continue
-        }
-
-        incrementImported()
-        
-      } catch (err: any) {
-        addFailedRow(row, err.message || 'Unknown error')
       }
       
-      // Yield to main thread every 10 rows to keep UI responsive
-      if (i % 10 === 0) {
-        await new Promise(resolve => setTimeout(resolve, 10))
-      }
+      // Yield to main thread after each batch
+      await new Promise(resolve => setTimeout(resolve, 50))
     }
     
     setIsProcessing(false)
@@ -132,28 +151,44 @@ export function ProgressStep() {
       else if (m.dbField === 'current_area') result.current_area = normalizeString(rawVal)
       else if (m.dbField === 'notes') result.notes = normalizeString(rawVal)
       
-      // Opportunity
-      else if (m.dbField === 'opportunity.highest_qualification') result.opportunity.highest_qualification = normalizeString(rawVal)
-      else if (m.dbField === 'opportunity.current_occupation') result.opportunity.current_occupation = normalizeString(rawVal)
-      else if (m.dbField === 'opportunity.current_salary') result.opportunity.current_salary = parseInt(String(rawVal).replace(/\D/g, '')) || 0
-      else if (m.dbField === 'opportunity.total_experience') result.opportunity.total_experience = parseInt(rawVal) || 0
-      else if (m.dbField === 'opportunity.status') result.opportunity.status = mapPipelineStage(rawVal)
+      // Direct Contact fields
+      else if (m.dbField === 'hometown') result.hometown = normalizeString(rawVal)
+      else if (m.dbField === 'currently_in_bangalore') {
+        const val = String(rawVal).toLowerCase().trim()
+        result.currently_in_bangalore = val === 'yes' || val === 'true' || val === '1'
+      }
+      else if (m.dbField === 'bangalore_tenure') result.bangalore_tenure = normalizeString(rawVal)
+      else if (m.dbField === 'education') result.education = normalizeString(rawVal)
+      else if (m.dbField === 'current_occupation') result.current_occupation = normalizeString(rawVal)
+      else if (m.dbField === 'current_salary') result.current_salary = parseInt(String(rawVal).replace(/\D/g, '')) || 0
+      else if (m.dbField === 'total_experience') result.total_experience = parseInt(rawVal) || 0
+      
+      // Opportunity (Using new JSON struct if needed, but the RPC expects them at root or opportunity)
+      else if (m.dbField === 'opportunity.highest_qualification') result.education = normalizeString(rawVal) // Fallback mapping
+      else if (m.dbField === 'opportunity.current_occupation') result.current_occupation = normalizeString(rawVal) // Fallback mapping
+      else if (m.dbField === 'opportunity.current_salary') result.current_salary = parseInt(String(rawVal).replace(/\D/g, '')) || 0 // Fallback mapping
+      else if (m.dbField === 'opportunity.total_experience') result.total_experience = parseInt(rawVal) || 0 // Fallback mapping
+      else if (m.dbField === 'opportunity.status') result.opportunity.pipeline_stage = mapPipelineStage(rawVal)
       else if (m.dbField === 'opportunity.candidate_category') result.opportunity.candidate_category = mapCandidateCategory(rawVal)
       
       // Dates
       else if (m.dbField === 'follow_up_date') result.follow_up_date = normalizeDate(rawVal)
       else if (m.dbField === 'walkin_date') result.walkin_date = normalizeDate(rawVal)
+      else if (m.dbField === 'walkin_attended') {
+        const val = String(rawVal).toLowerCase().trim()
+        result.walkin_attended = val === 'yes' || val === 'true' || val === '1'
+      }
       
-      // Custom Fields
-      else if (m.dbField.startsWith('custom_fields.')) {
-        const fieldName = m.dbField.replace('custom_fields.', '')
+      // Finance
+      else if (m.dbField.startsWith('finance.')) {
+        if (!result.finance) result.finance = {}
+        const fieldName = m.dbField.replace('finance.', '')
         
-        // Boolean conversion for specific fields
-        if (fieldName === 'google_form_filled' || fieldName === 'currently_in_blr' || fieldName === 'pr_done' || fieldName === 'agent_referral') {
+        if (fieldName === 'pr_done' || fieldName === 'agent_referral') {
           const val = String(rawVal).toLowerCase().trim()
-          result.custom_fields[fieldName] = val === 'yes' || val === 'true' || val === '1'
+          result.finance[fieldName] = val === 'yes' || val === 'true' || val === '1' || val === 'done'
         } else {
-          result.custom_fields[fieldName] = normalizeString(rawVal)
+          result.finance[fieldName] = parseFloat(String(rawVal).replace(/,/g, '')) || 0
         }
       }
     })
